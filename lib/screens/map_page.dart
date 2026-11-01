@@ -20,12 +20,13 @@ class _MapPageState extends State<MapPage> {
   final _ctrl = MapController();
   int _days = 3650; // all history by default
   Workout? _sel;
+  int? _type; // sport filter
   int _stamp = -1;
   int _fitted = -1;
 
   List<Workout> _filtered(HealthService hs) {
     final lim = DateTime.now().subtract(Duration(days: _days));
-    return hs.workouts.where((w) => w.hasRoute && w.start.isAfter(lim)).toList();
+    return hs.workouts.where((w) => w.hasRoute && w.start.isAfter(lim) && (_type == null || w.type == _type)).toList();
   }
 
   void _fit(List<LatLng> pts) {
@@ -41,8 +42,8 @@ class _MapPageState extends State<MapPage> {
       builder: (ctx, _) {
         final ws = _filtered(hs);
         // Load missing tracks when the list or the period changes
-        if (_stamp != ws.length + _days) {
-          _stamp = ws.length + _days;
+        if (_stamp != ws.length + _days + (_type ?? -1)) {
+          _stamp = ws.length + _days + (_type ?? -1);
           WidgetsBinding.instance.addPostFrameCallback((_) => hs.loadTracks(ws));
         }
         final shown = [for (final w in ws) if (hs.tracks.containsKey(w.id)) w];
@@ -56,8 +57,21 @@ class _MapPageState extends State<MapPage> {
         return SafeArea(child: Column(children: [
           M3PageHeader(showBack: false, title: L.navMap, subtitle: '${shown.length} ${isFr ? 'tracés' : 'routes'}'),
           SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+            FilterChipButton(
+              label: _type == null ? (isFr ? 'Tous les sports' : 'All sports') : sportName(sportOf(_type!)),
+              active: _type != null,
+              onTap: () async {
+                final counts = <int, int>{};
+                for (final w in hs.workouts) { if (w.hasRoute) counts[w.type] = (counts[w.type] ?? 0) + 1; }
+                final sorted = counts.entries.toList()..sort((x, y) => y.value.compareTo(x.value));
+                final r = await pickFilter(ctx, title: 'Sport', allLabel: isFr ? 'Tous les sports' : 'All sports',
+                    entries: [for (final e in sorted) FilterEntry('${e.key}', sportName(sportOf(e.key)), e.value, sportOf(e.key).icon)],
+                    current: _type?.toString());
+                if (r != null) setState(() { _type = r.isEmpty ? null : int.parse(r); _sel = null; _fitted = -1; });
+              },
+            ),
             for (final d in [7, 30, 90, 365, 3650]) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(label: Text(d == 3650 ? (isFr ? 'Tout' : 'All') : d == 365 ? (isFr ? '1 an' : '1y') : '${d}j'),
+                child: M3Chip(label: Text(d == 3650 ? (isFr ? 'Tout' : 'All') : d == 365 ? (isFr ? '1 an' : '1y') : '${d}j'),
                     selected: _days == d, onSelected: (_) => setState(() { _days = d; _sel = null; _fitted = -1; }))),
           ])),
           if (hs.trackBusy) Padding(padding: const EdgeInsets.fromLTRB(20, 2, 20, 4), child: M3WavyProgress(value: hs.trackProgress, height: 10)),
@@ -67,7 +81,7 @@ class _MapPageState extends State<MapPage> {
                   ? SyncLoader(text: isFr ? 'Chargement des tracés…' : 'Loading routes…', progress: hs.trackBusy ? hs.trackProgress : null)
                   : Column(mainAxisAlignment: MainAxisAlignment.center, children: [
                       M3EmptyState(icon: Icons.map_rounded, message: ws.isEmpty
-                          ? (isFr ? 'Aucun tracé GPS sur cette période' : 'No GPS routes in this period')
+                          ? (isFr ? 'Aucune donnée : pas de tracé GPS ici' : 'No data: no GPS route here')
                           : (isFr ? 'Les tracés doivent être autorisés' : 'Routes need your permission')),
                       if (ws.isNotEmpty) FilledButton.icon(
                           onPressed: () => hs.loadTracks(ws, ask: true),
@@ -82,14 +96,18 @@ class _MapPageState extends State<MapPage> {
                   children: [
                     hsTileLayer(ctx),
                     PolylineLayer(polylines: [
-                      for (final w in shown) Polyline(points: hs.tracks[w.id]!, strokeWidth: _sel?.id == w.id ? 7 : 4,
-                          color: sportColor(ctx, w.sport).withValues(alpha: _sel == null || _sel!.id == w.id ? 0.95 : 0.35)),
+                      for (final w in shown) if (_sel == null || _sel!.id == w.id) Polyline(points: hs.tracks[w.id]!, strokeWidth: _sel == null ? 4 : 6,
+                          color: sportColor(ctx, w.sport).withValues(alpha: 0.95)),
                     ]),
                     const SimpleAttributionWidget(source: Text('OpenStreetMap')),
                   ])))),
           SizedBox(height: 92, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), children: [
             for (final w in shown) Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(
-              onTap: () { setState(() => _sel = w); _fit(hs.tracks[w.id]!); },
+              onTap: () {
+                // tap = see only this route, tap again = see all
+                if (_sel?.id == w.id) { setState(() => _sel = null); _fit(all); }
+                else { setState(() => _sel = w); _fit(hs.tracks[w.id]!); }
+              },
               onLongPress: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => WorkoutDetailPage(workout: w))),
               child: Container(
                 width: 150, padding: const EdgeInsets.all(10),

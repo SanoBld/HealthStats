@@ -45,21 +45,36 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
           M3PageHeader(showBack: false, title: L.navActivities,
               subtitle: _type == null && _src == null ? '${list.length}' : '${list.length} / ${hs.workouts.length}'),
           SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ChoiceChip(label: Text(isFr ? 'Tout' : 'All'), selected: _type == null, onSelected: (_) => setState(() => _type = null))),
-            for (final t in types) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(avatar: Icon(sportOf(t).icon, size: 16), label: Text(sportName(sportOf(t))),
-                    selected: _type == t, onSelected: (_) => setState(() => _type = t))),
-          ])),
-          if (srcs.length > 1) SizedBox(height: 44, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ChoiceChip(avatar: const Icon(Icons.apps_rounded, size: 16),
-                label: Text(isFr ? 'Toutes les applis' : 'All apps'), selected: _src == null, onSelected: (_) => setState(() => _src = null))),
-            for (final a in srcs) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: ChoiceChip(label: Text(a), selected: _src == a, onSelected: (_) => setState(() => _src = a))),
+            FilterChipButton(
+              label: _type == null ? (isFr ? 'Tous les sports' : 'All sports') : sportName(sportOf(_type!)),
+              active: _type != null,
+              onTap: () async {
+                final counts = <int, int>{};
+                for (final w in hs.workouts) { counts[w.type] = (counts[w.type] ?? 0) + 1; }
+                final sorted = counts.entries.toList()..sort((x, y) => y.value.compareTo(x.value));
+                final r = await pickFilter(ctx, title: isFr ? 'Sport' : 'Sport', allLabel: isFr ? 'Tous les sports' : 'All sports',
+                    entries: [for (final e in sorted) FilterEntry('${e.key}', sportName(sportOf(e.key)), e.value, sportOf(e.key).icon)],
+                    current: _type?.toString());
+                if (r != null) setState(() => _type = r.isEmpty ? null : int.parse(r));
+              },
+            ),
+            if (srcs.length > 1) FilterChipButton(
+              label: _src ?? (isFr ? 'Toutes les applis' : 'All apps'),
+              active: _src != null,
+              onTap: () async {
+                final counts = <String, int>{};
+                for (final w in hs.workouts) { counts[w.sourceName] = (counts[w.sourceName] ?? 0) + 1; }
+                final sorted = counts.entries.toList()..sort((x, y) => y.value.compareTo(x.value));
+                final r = await pickFilter(ctx, title: isFr ? 'Application' : 'App', allLabel: isFr ? 'Toutes les applis' : 'All apps',
+                    entries: [for (final e in sorted) FilterEntry(e.key, e.key, e.value, Icons.apps_rounded)], current: _src);
+                if (r != null) setState(() => _src = r.isEmpty ? null : r);
+              },
+            ),
           ])),
           Expanded(child: list.isEmpty
               ? (hs.loading
                   ? Center(child: SyncLoader(text: hs.stage.isEmpty ? (isFr ? 'Chargement…' : 'Loading…') : hs.stage, progress: hs.progress))
-                  : M3EmptyState(icon: Icons.fitness_center_rounded, message: isFr ? 'Aucune activité' : 'No activities'))
+                  : M3EmptyState(icon: Icons.fitness_center_rounded, message: isFr ? 'Aucune donnée' : 'No data'))
               : RefreshIndicator(onRefresh: () => hs.sync(), child: ListView.builder(
                   padding: const EdgeInsets.only(bottom: 24), itemCount: items.length,
                   itemBuilder: (_, i) {

@@ -6,7 +6,6 @@ import '../app_state.dart';
 import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
-import '../widgets/m3_components.dart' show M3WavyProgress;
 import '../widgets/skeleton.dart' show M3LoadingIndicator;
 
 /// Map tiles: OpenStreetMap (no API key). In dark mode the tiles are inverted.
@@ -27,6 +26,8 @@ class WorkoutDetailPage extends StatefulWidget {
 }
 
 class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
+  // Calm sports: HR zones make no sense
+  static const _calm = {79, 83, 71, 48, 33};
   List<RoutePoint> _route = [];
   List<(DateTime, int)> _hr = [];
   bool _loading = true;
@@ -148,8 +149,10 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
               values: _hr.map((e) => e.$2.toDouble()).toList(), color: s.primary, unit: 'bpm',
               labelOf: (i) => _clock(_hr[i].$1.difference(w.start)), onScrub: _hrCursor)),
-          SectionTitle(isFr ? 'Zones (FC max $maxHr)' : 'Zones (max HR $maxHr)'),
-          ..._zoneRows(context, _zones(maxHr), col),
+          if (!_calm.contains(w.type)) ...[
+            SectionTitle(isFr ? 'Zones de FC' : 'HR zones'),
+            ..._zoneRows(context, _zones(maxHr), col),
+          ],
         ],
         if (alts.length > 1) ...[
           SectionTitle(isFr ? 'Altitude' : 'Elevation'),
@@ -188,7 +191,8 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
         child: Row(children: [
           SizedBox(width: 30, child: Text(names[i], style: const TextStyle(fontWeight: FontWeight.w700))),
-          Expanded(child: M3WavyProgress(value: z[i] / total, color: col, height: 12)),
+          Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(6),
+              child: LinearProgressIndicator(value: z[i] / total, minHeight: 10, color: col, backgroundColor: col.withValues(alpha: 0.15)))),
           SizedBox(width: 92, child: Text('${_clock(Duration(seconds: z[i].round()))} · ${(z[i] / total * 100).round()}%',
               textAlign: TextAlign.end, style: Theme.of(c).textTheme.labelMedium)),
         ]),

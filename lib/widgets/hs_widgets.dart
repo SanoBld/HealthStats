@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/health_models.dart';
 import '../app_state.dart';
 import '../services/health_service.dart';
-import 'm3_components.dart' show M3WavyProgress;
+import 'm3_components.dart' show M3Chip, M3WavyProgress;
 import 'm3_date_picker.dart';
 import 'skeleton.dart' show M3LoadingIndicator;
 
@@ -314,4 +314,76 @@ class _ScrubPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_ScrubPainter o) => o.f != f || o.v != v || o.color != color;
+}
+
+
+// ── Filters with many choices: one chip that opens a searchable list ──
+class FilterEntry {
+  final String key, label; final IconData? icon; final int count;
+  const FilterEntry(this.key, this.label, this.count, [this.icon]);
+}
+
+/// Returns the chosen key, '' for "all", or null if closed.
+Future<String?> pickFilter(BuildContext c, {required String title, required String allLabel,
+    required List<FilterEntry> entries, String? current}) {
+  return showModalBottomSheet<String>(
+    context: c, isScrollControlled: true, showDragHandle: true,
+    builder: (_) => _FilterSheet(title: title, allLabel: allLabel, entries: entries, current: current),
+  );
+}
+
+class _FilterSheet extends StatefulWidget {
+  final String title, allLabel; final List<FilterEntry> entries; final String? current;
+  const _FilterSheet({required this.title, required this.allLabel, required this.entries, this.current});
+  @override
+  State<_FilterSheet> createState() => _FilterSheetState();
+}
+
+class _FilterSheetState extends State<_FilterSheet> {
+  String _q = '';
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme;
+    final list = widget.entries.where((e) => e.label.toLowerCase().contains(_q.toLowerCase())).toList();
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(c).viewInsets.bottom),
+      child: SizedBox(height: MediaQuery.of(c).size.height * 0.7, child: Column(children: [
+        Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 8), child: Row(children: [
+          Expanded(child: Text(widget.title, style: Theme.of(c).textTheme.titleLarge)),
+        ])),
+        if (widget.entries.length > 6) Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 8), child: TextField(
+          onChanged: (v) => setState(() => _q = v),
+          decoration: InputDecoration(prefixIcon: const Icon(Icons.search_rounded), hintText: isFr ? 'Rechercher' : 'Search',
+              filled: true, fillColor: s.surfaceContainerHigh, border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none)),
+        )),
+        Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 24), children: [
+          if (_q.isEmpty) _tile(c, '', widget.allLabel, null, null),
+          for (final e in list) _tile(c, e.key, e.label, e.icon, e.count),
+          if (list.isEmpty) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(isFr ? 'Aucun résultat' : 'No result'))),
+        ])),
+      ])),
+    );
+  }
+
+  Widget _tile(BuildContext c, String key, String label, IconData? icon, int? count) {
+    final s = Theme.of(c).colorScheme;
+    final sel = (widget.current ?? '') == key;
+    return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: ListTile(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(sel ? 24 : 14)),
+      tileColor: sel ? s.primaryContainer : null,
+      leading: icon == null ? null : Icon(icon),
+      title: Text(label, style: TextStyle(fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
+      trailing: count == null ? null : Text('$count', style: Theme.of(c).textTheme.labelLarge?.copyWith(color: s.onSurfaceVariant)),
+      onTap: () => Navigator.pop(c, key),
+    ));
+  }
+}
+
+/// One chip showing the current choice; tap = open the list.
+class FilterChipButton extends StatelessWidget {
+  final String label; final bool active; final VoidCallback onTap;
+  const FilterChipButton({super.key, required this.label, required this.active, required this.onTap});
+  @override
+  Widget build(BuildContext c) => Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: M3Chip(label: Text('$label  ▾'), selected: active, onSelected: (_) => onTap()));
 }

@@ -138,37 +138,34 @@ class HealthService extends ChangeNotifier {
   }
 
   /// [ask]: if Health Connect wants a per-session consent, show its dialog.
-  Future<List<RoutePoint>> route(Workout w, {bool ask = false}) async {
-    if (_routes.containsKey(w.id)) return _routes[w.id]!;
+  /// [maxPoints] > 0 = small route (map tab), not kept in memory.
+  Future<List<RoutePoint>> route(Workout w, {bool ask = false, int maxPoints = 0}) async {
+    if (maxPoints == 0 && _routes.containsKey(w.id)) return _routes[w.id]!;
     try {
-      final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask}).timeout(const Duration(seconds: 40))) ?? [];
+      final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask, 'max': maxPoints}).timeout(const Duration(seconds: 40))) ?? [];
       final pts = r.map((e) {
         final l = (e as List).cast<num>();
         return RoutePoint(LatLng(l[0].toDouble(), l[1].toDouble()), l[2].toDouble(),
             DateTime.fromMillisecondsSinceEpoch(l[3].toInt()));
       }).toList();
-      if (pts.isNotEmpty) _routes[w.id] = pts;
+      if (pts.isNotEmpty && maxPoints == 0) _routes[w.id] = pts;
       return pts;
     } catch (_) { return []; }
   }
 
-  /// Loads small tracks for the map (3 at a time), saves them on disk.
+  /// Loads small tracks for the map (6 at a time, small routes), saves them on disk.
   Future<void> loadTracks(List<Workout> ws, {bool ask = false}) async {
     if (trackBusy) return;
     final todo = [for (final w in ws) if (w.hasRoute && !tracks.containsKey(w.id) && (ask || !_noTrack.contains(w.id))) w];
     if (todo.isEmpty) return;
     trackBusy = true; trackProgress = 0; notifyListeners();
     var done = 0;
-    for (var i = 0; i < todo.length; i += 3) {
-      final batch = todo.skip(i).take(3).toList();
+    for (var i = 0; i < todo.length; i += 6) {
+      final batch = todo.skip(i).take(6).toList();
       await Future.wait(batch.map((w) async {
-        final r = await route(w, ask: ask);
+        final r = await route(w, ask: ask, maxPoints: 150);
         if (r.length > 1) {
-          final step = (r.length / 150).ceil() < 1 ? 1 : (r.length / 150).ceil();
-          final pts = <LatLng>[for (var k = 0; k < r.length; k += step) r[k].pos];
-          if (pts.last != r.last.pos) pts.add(r.last.pos);
-          tracks[w.id] = pts;
-          _routes.remove(w.id); // keep memory small
+          tracks[w.id] = [for (final p in r) p.pos];
         } else { _noTrack.add(w.id); }
       }));
       done += batch.length;

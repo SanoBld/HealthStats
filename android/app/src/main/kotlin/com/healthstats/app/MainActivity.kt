@@ -156,7 +156,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 "granted" -> bridge.granted()
                                 "sessions" -> bridge.sessions(s, e, a?.get("lite") == true)
                                 "height" -> bridge.height()
-                                "route" -> bridge.route(a!!["id"] as String, if (a["ask"] == true) { id: String -> askRoute(id) } else null)
+                                "route" -> bridge.route(a!!["id"] as String, if (a["ask"] == true) { id: String -> askRoute(id) } else null, (a["max"] as? Number)?.toInt() ?: 0)
                                 "heartRate" -> bridge.heartRate(s, e)
                                 "daily" -> bridge.daily(s, e)
                                 "sleep" -> bridge.sleep(s, e)

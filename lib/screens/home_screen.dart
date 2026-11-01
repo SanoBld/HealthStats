@@ -7,6 +7,7 @@ import '../theme/m3_motion.dart';
 import 'activities_page.dart';
 import 'charts_page.dart';
 import 'dashboard_page.dart';
+import '../services/health_service.dart';
 import 'map_page.dart';
 import 'settings_page.dart';
 
@@ -16,12 +17,19 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _idx = 0;
   @override
-  void initState() { super.initState(); localeNotifier.addListener(_r); }
+  void initState() { super.initState(); localeNotifier.addListener(_r); WidgetsBinding.instance.addObserver(this); }
   @override
-  void dispose() { localeNotifier.removeListener(_r); super.dispose(); }
+  void dispose() { WidgetsBinding.instance.removeObserver(this); localeNotifier.removeListener(_r); super.dispose(); }
+  // Fresh steps when you come back to the app (at most every 5 min)
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState st) {
+    final hs = HealthService.instance;
+    if (st == AppLifecycleState.resumed && hs.permitted &&
+        (hs.lastSync == null || DateTime.now().difference(hs.lastSync!).inMinutes >= 5)) { hs.sync(); }
+  }
   void _r() => setState(() {});
 
   @override

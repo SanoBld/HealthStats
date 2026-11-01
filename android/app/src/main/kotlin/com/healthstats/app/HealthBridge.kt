@@ -157,13 +157,21 @@ class HealthBridge(private val ctx: Context) {
     }
 
     /** GPS points of a session: list of [lat, lng, alt, timeMs]. [ask] runs the consent dialog if needed. */
-    suspend fun route(sessionId: String, ask: (suspend (String) -> ExerciseRoute?)?): List<List<Double>> {
+    suspend fun route(sessionId: String, ask: (suspend (String) -> ExerciseRoute?)?, max: Int = 0): List<List<Double>> {
         val rec = client.readRecord(ExerciseSessionRecord::class, sessionId).record
-        return when (val r = rec.exerciseRouteResult) {
+        val all = when (val r = rec.exerciseRouteResult) {
             is ExerciseRouteResult.Data -> pts(r.exerciseRoute)
             is ExerciseRouteResult.ConsentRequired -> ask?.invoke(sessionId)?.let { pts(it) } ?: emptyList()
             else -> emptyList()
         }
+        // [max] > 0: keep ~max points only (small and fast for the map tab)
+        if (max <= 0 || all.size <= max) return all
+        val step = (all.size + max - 1) / max
+        val out = ArrayList<List<Double>>()
+        var i = 0
+        while (i < all.size) { out.add(all[i]); i += step }
+        if (out.last() !== all.last()) out.add(all.last())
+        return out
     }
 
     /** Heart-rate curve: list of [timeMs, bpm]. */

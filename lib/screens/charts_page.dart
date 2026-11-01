@@ -100,12 +100,22 @@ class _ChartsPageState extends State<ChartsPage> {
         )),
         SizedBox(height: 52, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: [
           for (final m in _Metric.values) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ChoiceChip(label: Text(_label(m)), selected: _metric == m, onSelected: (_) => setState(() => _metric = m))),
+              child: M3Chip(label: Text(_label(m)), selected: _metric == m, onSelected: (_) => setState(() => _metric = m))),
         ])),
         SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ChoiceChip(label: Text(isFr ? 'Tous sports' : 'All sports'), selected: _type == null, onSelected: (_) => setState(() => _type = null))),
-          for (final t in types) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: ChoiceChip(avatar: Icon(sportOf(t).icon, size: 16), label: Text(sportName(sportOf(t))), selected: _type == t, onSelected: (_) => setState(() => _type = t))),
+          FilterChipButton(
+            label: _type == null ? (isFr ? 'Tous sports' : 'All sports') : sportName(sportOf(_type!)),
+            active: _type != null,
+            onTap: () async {
+              final counts = <int, int>{};
+              for (final w in hs.workouts) { counts[w.type] = (counts[w.type] ?? 0) + 1; }
+              final sorted = counts.entries.toList()..sort((x, y) => y.value.compareTo(x.value));
+              final r = await pickFilter(ctx, title: 'Sport', allLabel: isFr ? 'Tous sports' : 'All sports',
+                  entries: [for (final e in sorted) FilterEntry('${e.key}', sportName(sportOf(e.key)), e.value, sportOf(e.key).icon)],
+                  current: _type?.toString());
+              if (r != null) setState(() => _type = r.isEmpty ? null : int.parse(r));
+            },
+          ),
         ])),
         const SizedBox(height: 8),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TrendChart(key: ValueKey('$_period$_metric$_type'), monthly: series)),
