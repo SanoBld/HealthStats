@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
+import '../widgets/skeleton.dart' show M3Spinner;
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -33,9 +34,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   Future<void> _connect() async {
     setState(() => _busy = true);
     final hs = HealthService.instance;
-    await hs.refreshStatus();
-    if (hs.status == HcStatus.available) await hs.requestPermissions();
-    setState(() => _busy = false);
+    try {
+      await hs.refreshStatus();
+      if (hs.status == HcStatus.available) await hs.requestPermissions();
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
     if (hs.permitted) { _finish(); }
   }
 
@@ -95,7 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             const SizedBox(height: 12),
             FilledButton.icon(
               onPressed: _busy ? null : _connect,
-              icon: _busy ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.favorite_rounded),
+              icon: _busy ? SizedBox(width: 22, height: 22, child: M3Spinner(color: s.onPrimary)) : const Icon(Icons.favorite_rounded),
               label: Text(isFr ? 'Autoriser l\'accès' : 'Allow access'),
             ),
             TextButton(onPressed: _finish, child: Text(isFr ? 'Plus tard' : 'Later')),

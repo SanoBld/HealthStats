@@ -128,8 +128,15 @@ class MainActivity : FlutterFragmentActivity() {
             .setMethodCallHandler { call, result ->
                 if (call.method == "status") { result.success(bridge.status()); return@setMethodCallHandler }
                 if (call.method == "requestPermissions") {
+                    // never leave an old request waiting forever
+                    pendingPerm?.success(emptyList<String>())
                     pendingPerm = result
-                    permLauncher.launch(HealthBridge.PERMISSIONS)
+                    try {
+                        permLauncher.launch(HealthBridge.PERMISSIONS)
+                    } catch (e: Exception) {
+                        pendingPerm = null
+                        result.error("perm", e.message, null)
+                    }
                     return@setMethodCallHandler
                 }
                 if (call.method == "openSettings") {
@@ -147,7 +154,8 @@ class MainActivity : FlutterFragmentActivity() {
                         val out: Any? = withContext(Dispatchers.IO) {
                             when (call.method) {
                                 "granted" -> bridge.granted()
-                                "sessions" -> bridge.sessions(s, e)
+                                "sessions" -> bridge.sessions(s, e, a?.get("lite") == true)
+                                "height" -> bridge.height()
                                 "route" -> bridge.route(a!!["id"] as String, if (a["ask"] == true) { id: String -> askRoute(id) } else null)
                                 "heartRate" -> bridge.heartRate(s, e)
                                 "daily" -> bridge.daily(s, e)

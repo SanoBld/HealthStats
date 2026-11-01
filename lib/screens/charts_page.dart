@@ -22,6 +22,7 @@ class _ChartsPageState extends State<ChartsPage> {
   _Metric _metric = _Metric.minutes;
   _Period _period = _Period.week;
   int? _type;
+  late final Future<List<(DateTime, double)>> _weights = HealthService.instance.weights();
 
   String _label(_Metric m) => switch (m) {
         _Metric.sessions => isFr ? 'Séances' : 'Workouts',
@@ -116,8 +117,42 @@ class _ChartsPageState extends State<ChartsPage> {
             items: share, getLabel: (e) => sportName(sportOf((e as MapEntry<int, int>).key)),
             getPlays: (e) => (e as MapEntry<int, int>).value)),
         ],
+        ..._trends(hs),
       ]));
     });
+  }
+}
+
+extension _Trends on _ChartsPageState {
+  /// Touchable daily curves: heart rate, steps, weight (drag a finger to read each day).
+  List<Widget> _trends(HealthService hs) {
+    final lim = DateTime.now().subtract(const Duration(days: 90));
+    final d90 = hs.days.where((d) => d.day.isAfter(lim)).toList();
+    final hr = d90.where((d) => d.hrAvg > 0).toList();
+    final st = d90.where((d) => d.steps > 0).toList();
+    String lab(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+    final p = Theme.of(context).colorScheme.primary;
+    return [
+      if (hr.length > 1) ...[
+        SectionTitle(isFr ? 'Fréquence cardiaque moyenne (90 j)' : 'Average heart rate (90d)'),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
+            values: hr.map((d) => d.hrAvg).toList(), color: p, unit: 'bpm', labelOf: (i) => lab(hr[i].day))),
+      ],
+      if (st.length > 1) ...[
+        SectionTitle(isFr ? 'Pas par jour (90 j)' : 'Steps per day (90d)'),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
+            values: st.map((d) => d.steps.toDouble()).toList(), color: p, unit: isFr ? 'pas' : 'steps', labelOf: (i) => lab(st[i].day))),
+      ],
+      FutureBuilder<List<(DateTime, double)>>(future: _weights, builder: (_, snap) {
+        final w = snap.data ?? const <(DateTime, double)>[];
+        if (w.length < 2) return const SizedBox.shrink();
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SectionTitle(isFr ? 'Poids' : 'Weight'),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
+              values: w.map((e) => e.$2).toList(), color: p, unit: 'kg', decimals: 1, labelOf: (i) => lab(w[i].$1))),
+        ]);
+      }),
+    ];
   }
 }
 

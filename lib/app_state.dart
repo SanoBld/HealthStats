@@ -24,6 +24,7 @@ final stepGoalNotifier         = ValueNotifier<int>(10000);
 final weeklyGoalNotifier       = ValueNotifier<int>(3);      // séances/semaine
 final unitsMetricNotifier      = ValueNotifier<bool>(true);
 final onboardedNotifier        = ValueNotifier<bool>(false);
+final sportColorsNotifier      = ValueNotifier<bool>(true);  // one colour per sport (off = accent only)
 
 Future<void> loadAppState() async {
   final p = await SharedPreferences.getInstance();
@@ -44,6 +45,7 @@ Future<void> loadAppState() async {
   weeklyGoalNotifier.value = p.getInt('hs_weeklygoal') ?? 3;
   unitsMetricNotifier.value = p.getBool('hs_metric') ?? true;
   onboardedNotifier.value = p.getBool('hs_onboarded') ?? false;
+  sportColorsNotifier.value = p.getBool('hs_sportcolors') ?? true;
 }
 
 /// Binds every notifier to SharedPreferences (automatic write).
@@ -66,4 +68,5 @@ void bindPersistence(SharedPreferences p) {
   b(profileSexNotifier, 'hs_sex'); b(stepGoalNotifier, 'hs_stepgoal');
   b(weeklyGoalNotifier, 'hs_weeklygoal'); b(unitsMetricNotifier, 'hs_metric');
   b(onboardedNotifier, 'hs_onboarded');
+  b(sportColorsNotifier, 'hs_sportcolors');
 }

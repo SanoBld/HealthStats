@@ -4,6 +4,7 @@ import '../app_state.dart';
 import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
+import '../widgets/skeleton.dart' show M3LoadingIndicator;
 import 'settings_page.dart' show showProfileSheet;
 import 'workout_detail_page.dart';
 
@@ -17,7 +18,7 @@ class DashboardPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final hs = HealthService.instance;
     return ListenableBuilder(
-      listenable: Listenable.merge([hs, profileNameNotifier, stepGoalNotifier, weeklyGoalNotifier, unitsMetricNotifier, localeNotifier]),
+      listenable: Listenable.merge([hs, profileNameNotifier, stepGoalNotifier, weeklyGoalNotifier, unitsMetricNotifier, localeNotifier, sportColorsNotifier]),
       builder: (ctx, _) {
         final s = Theme.of(ctx).colorScheme, t = Theme.of(ctx).textTheme;
         final today = hs.dayStat(DateTime.now());
@@ -52,7 +53,7 @@ class DashboardPage extends StatelessWidget {
                             style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                         Text(_sub(hs), style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
                       ])),
-                      if (hs.loading) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
+                      if (hs.loading) const M3LoadingIndicator(size: 32),
                     ]),
                   ),
                 ),
@@ -60,7 +61,13 @@ class DashboardPage extends StatelessWidget {
             ),
             SliverList(delegate: SliverChildListDelegate([
               if (!hs.permitted) _ConnectCard(hs: hs),
-              if (hs.error != null) Padding(padding: const EdgeInsets.all(16), child: Text(hs.error!, style: TextStyle(color: s.error))),
+              if (hs.permitted && !hs.hasHistoryPerm) _HistoryCard(hs: hs),
+              if (hs.error != null) Padding(padding: const EdgeInsets.all(16), child: Row(children: [
+                Expanded(child: Text(hs.error!, style: TextStyle(color: s.error))),
+                TextButton(onPressed: hs.loading ? null : () => hs.sync(), child: Text(isFr ? 'Réessayer' : 'Retry')),
+              ])),
+              if (hs.loading && hs.workouts.isEmpty)
+                Center(child: SyncLoader(text: hs.stage.isEmpty ? (isFr ? 'Chargement…' : 'Loading…') : hs.stage, progress: hs.progress)),
 
               SectionTitle(isFr ? 'Aujourd\'hui' : 'Today'),
               Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Row(children: [
@@ -105,6 +112,26 @@ class DashboardPage extends StatelessWidget {
     if (hs.lastSync == null) return isFr ? 'Non synchronisé' : 'Not synced';
     final m = DateTime.now().difference(hs.lastSync!).inMinutes;
     return isFr ? 'Synchronisé il y a ${m < 1 ? "<1" : m} min' : 'Synced ${m < 1 ? "<1" : m} min ago';
+  }
+}
+
+class _HistoryCard extends StatelessWidget {
+  final HealthService hs;
+  const _HistoryCard({required this.hs});
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme;
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8), padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(color: s.tertiaryContainer, borderRadius: BorderRadius.circular(16)),
+      child: Row(children: [
+        Icon(Icons.history_rounded, color: s.tertiary),
+        const SizedBox(width: 12),
+        Expanded(child: Text(isFr ? 'Sans l\'accès à l\'historique, seuls les 30 derniers jours sont lus.' : 'Without history access only the last 30 days are read.',
+            style: TextStyle(color: s.onTertiaryContainer))),
+        FilledButton(onPressed: hs.requestPermissions, child: Text(isFr ? 'Autoriser' : 'Allow')),
+      ]),
+    );
   }
 }
 
