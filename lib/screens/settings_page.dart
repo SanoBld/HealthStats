@@ -1,4 +1,4 @@
-// Réglages (même structure que LastStats : sections, lignes, feuilles).
+// Settings (same structure as LastStats: sections, rows, sheets).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_state.dart';

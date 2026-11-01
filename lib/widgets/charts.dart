@@ -1,6 +1,6 @@
 // lib/widgets/charts.dart
-// Graphiques repris de LastStats (_charts_visuals.dart) : tendance zoomable,
-// barres par jour de semaine, donut de répartition. Données = séances santé.
+// Charts taken from LastStats (_charts_visuals.dart): zoomable trend,
+// per-weekday bars, share donut. Data = health workouts.
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -557,7 +557,14 @@ Color _cardBg(ColorScheme s, [Color? tint]) => (_chartExportMode && _exportBgCol
     : Color.alphaBlend(tint.withValues(alpha: 0.32), s.surfaceContainerLow);
 
 void _paintText(Canvas c, String text, Offset o,
-    {required Color color, double size = 10, FontWeight weight = FontWeight.w600, int align = 1}
+    {required Color color, double size = 10, FontWeight weight = FontWeight.w600, int align = 1}) {
+  final tp = TextPainter(
+    text: TextSpan(text: text, style: TextStyle(color: color, fontSize: size, fontWeight: weight)),
+    textDirection: TextDirection.ltr,
+  )..layout();
+  final dx = align == 0 ? 0.0 : (align == 1 ? -tp.width / 2 : -tp.width);
+  tp.paint(c, Offset(o.dx + dx, o.dy - tp.height / 2));
+}
 
 Color _onColor(Color c) =>
     ThemeData.estimateBrightnessForColor(c) == Brightness.dark ? Colors.white : Colors.black;

@@ -1,4 +1,4 @@
-// lib/main.dart — HealthStats (Android). Thème Nothing OS repris de LastStats.
+// lib/main.dart — HealthStats (Android). Nothing OS theme reused from LastStats.
 import 'package:dynamic_color/dynamic_color.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,7 +22,7 @@ Future<void> main() async {
   await loadAppState();
   bindPersistence(await SharedPreferences.getInstance());
   await UpdateService.init();
-  HealthService.instance.init(); // non bloquant : le cache s'affiche d'abord
+  HealthService.instance.init(); // non-blocking: the cache is shown first
   runApp(const HealthStatsApp());
 }
 

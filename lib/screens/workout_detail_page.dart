@@ -1,4 +1,4 @@
-// Détail d'une séance : carte GPS, stats, courbe FC, altitude, muscu.
+// Workout detail: GPS map, stats, heart-rate curve, elevation, strength sets.
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
 import 'package:latlong2/latlong.dart';
@@ -6,7 +6,7 @@ import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
 
-/// Couche de tuiles adaptée au thème (OSM clair / CARTO sombre).
+/// Tile layer matching the theme (OSM light / CARTO dark).
 Widget hsTileLayer(BuildContext c) {
   final dark = Theme.of(c).brightness == Brightness.dark;
   return TileLayer(

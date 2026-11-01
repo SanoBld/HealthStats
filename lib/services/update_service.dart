@@ -11,8 +11,9 @@ enum DownloadKind { apk, installer, zip, none }
 class UpdateService {
   UpdateService._();
 
-  static const _owner = 'YOUR_GITHUB_USER';
-  static const _repo  = 'HealthStats';
+  // "owner/repo", injected by the CI build (--dart-define=GITHUB_REPO=...).
+  // Empty in local runs: the update check is then simply disabled.
+  static const _slug = String.fromEnvironment('GITHUB_REPO');
 
   static String currentVersion = '0.0.0';
   static String currentBuildNumber = '';
@@ -76,9 +77,10 @@ class UpdateService {
     UpdateChannel channel = UpdateChannel.stable,
     int perPage = 30,
   }) async {
+    if (_slug.isEmpty) return [];
     try {
       final uri = Uri.parse(
-        'https://api.github.com/repos/$_owner/$_repo/releases?per_page=$perPage',
+        'https://api.github.com/repos/$_slug/releases?per_page=$perPage',
       );
       final res = await http.get(uri, headers: const {
         'Accept': 'application/vnd.github+json',

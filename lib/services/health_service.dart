@@ -1,4 +1,4 @@
-// Pont Dart ↔ Health Connect (Google Health) + cache disque JSON.
+// Dart <-> Health Connect (Google Health) bridge + JSON disk cache.
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
@@ -53,7 +53,7 @@ class HealthService extends ChangeNotifier {
 
   Future<void> openHealthConnect() async { try { await _ch.invokeMethod('openSettings'); } catch (_) {} }
 
-  /// Sync : 400 derniers jours de séances + 400 jours de totaux quotidiens.
+  /// Sync: last 400 days of workouts + 400 days of daily totals.
   Future<void> sync({int daysBack = 400}) async {
     if (loading || !permitted) return;
     loading = true; error = null; notifyListeners();
@@ -88,7 +88,7 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return []; }
   }
 
-  /// Courbe FC : [(temps, bpm)].
+  /// Heart-rate curve: [(time, bpm)].
   Future<List<(DateTime, int)>> heartRate(Workout w) async {
     try {
       final r = (await _ch.invokeMethod<List>('heartRate',
@@ -108,7 +108,7 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return []; }
   }
 
-  // ── Cache disque ──
+  // ── Disk cache ──
   Future<File> get _file async => File('${(await getApplicationSupportDirectory()).path}/hs_cache.json');
   Future<void> _saveCache() async {
     try {
@@ -132,7 +132,7 @@ class HealthService extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ── Agrégations pratiques ──
+  // ── Handy aggregations ──
   List<Workout> between(DateTime a, DateTime b) =>
       workouts.where((w) => !w.start.isBefore(a) && w.start.isBefore(b)).toList();
   Workout? get last => workouts.isEmpty ? null : workouts.first;

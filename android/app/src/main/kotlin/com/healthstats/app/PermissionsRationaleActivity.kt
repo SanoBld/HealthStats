@@ -4,7 +4,7 @@ import android.app.Activity
 import android.os.Bundle
 import android.widget.TextView
 
-/** Écran exigé par Health Connect : explique pourquoi l'app lit les données. */
+/** Screen required by Health Connect: explains why the app reads the data. */
 class PermissionsRationaleActivity : Activity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

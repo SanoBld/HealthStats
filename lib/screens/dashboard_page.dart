@@ -1,4 +1,4 @@
-// Dashboard : en-tête profil, aujourd'hui, dernière séance, muscu, semaine, récents.
+// Dashboard: profile header, today, last workout, strength, week, recent.
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/health_models.dart';

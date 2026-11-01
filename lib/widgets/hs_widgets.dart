@@ -1,4 +1,4 @@
-// Petits composants communs HealthStats (style cartes LastStats).
+// Small shared HealthStats components (LastStats card style).
 import 'package:flutter/material.dart';
 import '../models/health_models.dart';
 import '../l10n/l10n.dart';
@@ -103,7 +103,7 @@ class WorkoutCard extends StatelessWidget {
   }
 }
 
-/// Anneau de progression (pas du jour).
+/// Progress ring (today's steps).
 class RingProgress extends StatelessWidget {
   final double value; final String center, caption; final double size;
   const RingProgress({super.key, required this.value, required this.center, required this.caption, this.size = 130});
@@ -123,7 +123,7 @@ class RingProgress extends StatelessWidget {
   }
 }
 
-/// Courbe simple (fréquence cardiaque, altitude…).
+/// Simple line chart (heart rate, elevation…).
 class LineSpark extends StatelessWidget {
   final List<double> values; final Color color; final double height;
   const LineSpark({super.key, required this.values, required this.color, this.height = 120});

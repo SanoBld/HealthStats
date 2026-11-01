@@ -14,7 +14,7 @@ Design repris de **LastStats** (thème Nothing OS, Material 3). **Android unique
 
 ## Mettre à jour sans désinstaller
 L'APK est signé avec `android/debug.keystore` (committé) → même signature à chaque build.
-1. Remplacez `YOUR_GITHUB_USER` dans `lib/services/update_service.dart` par votre pseudo GitHub.
+1. Rien à configurer : le dépôt GitHub est injecté automatiquement par le workflow (`--dart-define=GITHUB_REPO`).
 2. Poussez un tag `v0.1.1` (ou lancez *Release HealthStats* dans l'onglet Actions).
 3. Le workflow construit les APK **arm64-v8a, armeabi-v7a, x86_64 et universal** et les publie.
 4. Dans l'app : Réglages → Mises à jour (installe par-dessus).

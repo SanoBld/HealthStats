@@ -20,7 +20,7 @@ android {
     }
 
     signingConfigs {
-        // Clé de signature committée dans le repo : même signature à chaque build => mise à jour sans désinstaller.
+        // Signing key committed to the repo: same signature on every build => update without uninstalling.
         // rootProject.file() resolves relative to the android/ directory.
         create("localDebug") {
             storeFile     = rootProject.file("debug.keystore")

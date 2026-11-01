@@ -1,4 +1,4 @@
-// Onglet Activités : liste filtrable par sport.
+// Activities tab: workout list filterable by sport.
 import 'package:flutter/material.dart';
 import '../l10n/l10n.dart';
 import '../models/health_models.dart';

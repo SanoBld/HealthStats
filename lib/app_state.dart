@@ -1,4 +1,4 @@
-// État global (ValueNotifier) — mêmes noms que LastStats pour réutiliser thème & réglages.
+// Global state (ValueNotifier) — same names as LastStats so theme & settings code can be reused.
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -16,7 +16,7 @@ final textScaleNotifier        = ValueNotifier<double>(1.1);
 final appFontNotifier          = ValueNotifier<String>('GoogleSansFlex');
 final imageShapeNotifier       = ValueNotifier<String>('mix');
 final minuteTickNotifier       = ValueNotifier<int>(0);
-// Profil santé (configuré au 1er lancement)
+// Health profile (set up on first launch)
 final profileNameNotifier      = ValueNotifier<String>('');
 final profileHeightNotifier    = ValueNotifier<double>(0);   // cm
 final profileWeightNotifier    = ValueNotifier<double>(0);   // kg
@@ -50,7 +50,7 @@ Future<void> loadAppState() async {
   onboardedNotifier.value = p.getBool('hs_onboarded') ?? false;
 }
 
-/// Branche chaque notifier à SharedPreferences (écriture automatique).
+/// Binds every notifier to SharedPreferences (automatic write).
 void bindPersistence(SharedPreferences p) {
   void b<T>(ValueNotifier<T> n, String k) => n.addListener(() {
         final v = n.value;

@@ -1,4 +1,4 @@
-// Première configuration : profil (en haut du dashboard ensuite) + Health Connect.
+// First-run setup: profile (shown at the top of the dashboard afterwards) + Health Connect.
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../services/health_service.dart';

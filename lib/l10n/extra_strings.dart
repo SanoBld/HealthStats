@@ -1,4 +1,4 @@
-// tx('key', {'n': '3'}) — textes UI par clé (FR/EN), repli sur EN puis la clé.
+// tx('key', {'n': '3'}) — keyed UI strings (FR/EN), falls back to EN then the key.
 import '../app_state.dart';
 
 const Map<String, Map<String, String>> _kTx = {

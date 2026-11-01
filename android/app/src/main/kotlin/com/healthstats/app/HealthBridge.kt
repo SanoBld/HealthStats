@@ -14,7 +14,7 @@ import java.time.LocalDateTime
 import java.time.Period
 import java.time.ZoneId
 
-/** Lecture Health Connect -> Map/List simples (sérialisés par le MethodChannel). */
+/** Reads Health Connect and returns plain Map/List values (serialized by the MethodChannel). */
 class HealthBridge(private val ctx: Context) {
 
     companion object {
@@ -47,7 +47,7 @@ class HealthBridge(private val ctx: Context) {
     private fun range(s: Long, e: Long) =
         TimeRangeFilter.between(Instant.ofEpochMilli(s), Instant.ofEpochMilli(e))
 
-    /** Séances d'exercice (sans trajet : voir [route]). */
+    /** Exercise sessions (without route: see [route]). */
     suspend fun sessions(startMs: Long, endMs: Long): List<Map<String, Any?>> {
         val out = ArrayList<Map<String, Any?>>()
         var token: String? = null
@@ -117,7 +117,7 @@ class HealthBridge(private val ctx: Context) {
         return out
     }
 
-    /** Points GPS d'une séance : liste de [lat, lng, alt, timeMs]. */
+    /** GPS points of a session: list of [lat, lng, alt, timeMs]. */
     suspend fun route(sessionId: String): List<List<Double>> {
         val res = client.readRecord(ExerciseSessionRecord::class, sessionId)
         val r = res.record.exerciseRouteResult
@@ -131,7 +131,7 @@ class HealthBridge(private val ctx: Context) {
         }
     }
 
-    /** Courbe de fréquence cardiaque : liste de [timeMs, bpm]. */
+    /** Heart-rate curve: list of [timeMs, bpm]. */
     suspend fun heartRate(startMs: Long, endMs: Long): List<List<Long>> {
         val out = ArrayList<List<Long>>()
         var token: String? = null
@@ -145,7 +145,7 @@ class HealthBridge(private val ctx: Context) {
         return out
     }
 
-    /** Totaux quotidiens (pas, distance, kcal) entre deux dates locales. */
+    /** Daily totals (steps, distance, kcal) between two local dates. */
     suspend fun daily(startMs: Long, endMs: Long): List<Map<String, Any?>> {
         val zone = ZoneId.systemDefault()
         val from = LocalDateTime.ofInstant(Instant.ofEpochMilli(startMs), zone).toLocalDate().atStartOfDay()

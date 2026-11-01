@@ -1,4 +1,4 @@
-// Modèles + métadonnées des types d'exercice Health Connect.
+// Models + metadata for Health Connect exercise types.
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart';
 
@@ -6,12 +6,12 @@ class SportInfo {
   final String fr, en;
   final IconData icon;
   final Color color;
-  final bool strength; // séance de muscu (affiche séries/répétitions)
-  final bool outdoor;  // a normalement un tracé GPS
+  final bool strength; // strength session (shows sets/reps)
+  final bool outdoor;  // normally has a GPS route
   const SportInfo(this.fr, this.en, this.icon, this.color, {this.strength = false, this.outdoor = false});
 }
 
-// Constantes ExerciseSessionRecord.EXERCISE_TYPE_*
+// Constants from ExerciseSessionRecord.EXERCISE_TYPE_*
 const Map<int, SportInfo> kSports = {
   56: SportInfo('Course', 'Running', Icons.directions_run_rounded, Color(0xFFFF2020), outdoor: true),
   57: SportInfo('Course (tapis)', 'Treadmill', Icons.directions_run_rounded, Color(0xFFFF5A5A)),
@@ -59,7 +59,7 @@ class Workout {
   SportInfo get sport => sportOf(type);
   Duration get duration => end.difference(start);
   double get kcal => activeKcal > 0 ? activeKcal : totalKcal;
-  /// Allure min/km (course/marche) ou null.
+  /// Pace in min/km (running/walking) or null.
   double? get paceMinKm => distanceM > 100 ? duration.inSeconds / 60 / (distanceM / 1000) : null;
   double? get speedKmh => distanceM > 100 ? (distanceM / 1000) / (duration.inSeconds / 3600) : null;
   int get totalReps => segments.fold(0, (a, s) => a + s.reps);
@@ -99,7 +99,7 @@ class RoutePoint {
   RoutePoint(this.pos, this.alt, this.time);
 }
 
-// ── Formatage ───────────────────────────────────────────────────────────
+// ── Formatting ───────────────────────────────────────────────────────────
 String fmtDuration(Duration d) {
   final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
   return h > 0 ? '${h}h${m.toString().padLeft(2, '0')}' : '$m:${s.toString().padLeft(2, '0')}';

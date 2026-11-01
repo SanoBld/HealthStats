@@ -1,8 +1,8 @@
-// L.xxx — libellés UI (FR/EN). Ajoutez une clé dans _k pour chaque nouveau texte.
+// L.xxx — UI labels (FR/EN). Add a key to _k for every new text.
 import '../app_state.dart';
 
 const Map<String, List<String>> _k = {
-  // clé: [fr, en]
+  // key: [fr, en]
   'colorPickerBrightness': ['Luminosité', 'Brightness'], 'colorPickerHue': ['Teinte', 'Hue'],
   'colorPickerInvalid': ['Hex invalide', 'Invalid hex'], 'colorPickerQuickColors': ['Couleurs rapides', 'Quick colors'],
   'colorPickerSaturation': ['Saturation', 'Saturation'], 'colorPickerTitle': ['Couleur', 'Color'],

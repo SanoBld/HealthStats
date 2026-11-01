@@ -1,5 +1,5 @@
-// Onglet Graphiques : mêmes visuels que LastStats (tendance zoomable, jours de
-// semaine, donut), alimentés par les séances Health Connect.
+// Charts tab: same visuals as LastStats (zoomable trend, weekdays,
+// donut), fed by Health Connect workouts.
 import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../l10n/l10n.dart';
@@ -76,11 +76,11 @@ class _ChartsPageState extends State<ChartsPage> {
       final types = {for (final w in hs.workouts) w.type};
       final ws = hs.workouts.where((w) => _type == null || w.type == _type).toList();
       final series = _series(hs, ws);
-      // Par jour de semaine (sur 12 semaines)
+      // By weekday (last 12 weeks)
       final lim = DateTime.now().subtract(const Duration(days: 84));
       final byDay = {for (var d = 1; d <= 7; d++) d: 0};
       for (final w in ws.where((w) => w.start.isAfter(lim))) { byDay[w.start.weekday] = byDay[w.start.weekday]! + _val(w); }
-      // Répartition par sport (durée, 30 j)
+      // Share by sport (duration, 30 days)
       final per = <int, int>{};
       for (final w in hs.workouts.where((w) => w.start.isAfter(DateTime.now().subtract(const Duration(days: 30))))) {
         per[w.type] = (per[w.type] ?? 0) + w.duration.inMinutes;
@@ -121,7 +121,7 @@ class _ChartsPageState extends State<ChartsPage> {
   }
 }
 
-// Écoute du changement de langue pour rebâtir la page.
+// Listens to locale changes so the page rebuilds.
 final Listenable localeNotifierListenable = _LocaleListen();
 class _LocaleListen extends ChangeNotifier {
   _LocaleListen() { localeNotifier.addListener(notifyListeners); }

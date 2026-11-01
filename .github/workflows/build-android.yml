@@ -71,7 +71,7 @@ jobs:
           IN_VERSION: ${{ inputs.version }}
         run: |
           VERSION="${IN_VERSION:-0.0.0-dev.${{ github.run_number }}}"
-          flutter build apk --release ${{ matrix.flags }} --build-name="$VERSION" --build-number=${{ github.run_number }}
+          flutter build apk --release ${{ matrix.flags }} --dart-define=GITHUB_REPO=${{ github.repository }} --build-name="$VERSION" --build-number=${{ github.run_number }}
 
       # Gradle (Kotlin DSL) task: copy + rename the APK into dist/
       - name: Collect APK with Gradle

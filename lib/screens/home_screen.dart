@@ -1,4 +1,4 @@
-// Navigation principale : 5 onglets (comme LastStats).
+// Main navigation: 5 tabs (like LastStats).
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_state.dart';
