@@ -49,7 +49,7 @@ class DashboardPage extends StatelessWidget {
                       const SizedBox(width: 14),
                       Expanded(child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                         Text(profileNameNotifier.value.isEmpty ? (isFr ? 'Configurer le profil' : 'Set up profile') : profileNameNotifier.value,
-                            style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800, fontFamily: 'Ndot57')),
+                            style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                         Text(_sub(hs), style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
                       ])),
                       if (hs.loading) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
@@ -67,7 +67,7 @@ class DashboardPage extends StatelessWidget {
                 RingProgress(value: goal > 0 ? (today?.steps ?? 0) / goal : 0,
                     center: '${today?.steps ?? 0}', caption: '/ $goal ${isFr ? 'pas' : 'steps'}'),
                 const SizedBox(width: 16),
-                Expanded(child: Column(children: [
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                   StatTile(icon: Icons.local_fire_department_rounded, value: '${(today?.activeKcal ?? 0).round()}', label: 'kcal'),
                   const SizedBox(height: 10),
                   StatTile(icon: Icons.straighten_rounded, value: distLabel(today?.distanceM ?? 0), label: isFr ? 'Distance' : 'Distance'),

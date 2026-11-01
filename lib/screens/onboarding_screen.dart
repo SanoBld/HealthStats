@@ -14,7 +14,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final _name = TextEditingController(text: profileNameNotifier.value);
   final _h = TextEditingController();
   final _w = TextEditingController();
-  final _y = TextEditingController();
+  DateTime? _birth;
   String _sex = '';
   int _step = 0;
   bool _busy = false;
@@ -25,7 +25,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     profileNameNotifier.value = _name.text.trim();
     profileHeightNotifier.value = _num(_h);
     profileWeightNotifier.value = _num(_w);
-    profileBirthYearNotifier.value = int.tryParse(_y.text) ?? 0;
+    profileBirthNotifier.value = _birth == null ? '' : birthToStr(_birth!);
     profileSexNotifier.value = _sex;
     onboardedNotifier.value = true; // main.dart bascule sur HomeScreen
   }
@@ -47,7 +47,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: ListView(padding: const EdgeInsets.all(24), children: [
           const SizedBox(height: 24),
-          Text('HEALTHSTATS', style: t.displaySmall?.copyWith(fontFamily: 'Ndot57', color: s.primary)),
+          Text('HEALTHSTATS', style: t.displaySmall?.copyWith(fontWeight: FontWeight.w800, color: s.primary)),
           const SizedBox(height: 8),
           Text(isFr ? 'Vos stats de santé, réinventées.' : 'Your health stats, reinvented.',
               style: t.bodyLarge?.copyWith(color: s.onSurfaceVariant)),
@@ -58,7 +58,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             _field(_name, isFr ? 'Prénom' : 'Name', Icons.person_rounded),
             _field(_h, isFr ? 'Taille (cm)' : 'Height (cm)', Icons.height_rounded, num: true),
             _field(_w, isFr ? 'Poids (kg)' : 'Weight (kg)', Icons.monitor_weight_rounded, num: true),
-            _field(_y, isFr ? 'Année de naissance' : 'Birth year', Icons.cake_rounded, num: true),
+            Padding(padding: const EdgeInsets.only(bottom: 12), child: TextField(
+              readOnly: true,
+              controller: TextEditingController(text: _birth == null ? '' : fmtDay(_birth!)),
+              decoration: InputDecoration(labelText: isFr ? 'Date de naissance' : 'Birth date', prefixIcon: const Icon(Icons.cake_rounded),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(6))),
+              onTap: () async {
+                final d = await pickBirthDate(context, _birth);
+                if (d != null) setState(() => _birth = d);
+              },
+            )),
             const SizedBox(height: 8),
             SegmentedButton<String>(
               segments: [

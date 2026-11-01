@@ -329,8 +329,10 @@ class M3PageHeader extends StatelessWidget {
     this.subtitle,
     this.leading,
     this.actions = const [],
+    this.showBack = true,
   });
 
+  final bool         showBack;
   final String       title;
   final String?      subtitle;
   final Widget?      leading;   // for example an emoji, after the back button
@@ -343,11 +345,14 @@ class M3PageHeader extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
       child: Row(children: [
-        IconButton.filledTonal(
-          icon: const Icon(Icons.arrow_back_rounded),
-          onPressed: () => Navigator.of(context).maybePop(),
-        ),
-        const SizedBox(width: 12),
+        if (showBack) ...[
+          IconButton.filledTonal(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).maybePop(),
+          ),
+          const SizedBox(width: 12),
+        ] else
+          const SizedBox(width: 8),
         if (leading != null) ...[leading!, const SizedBox(width: 8)],
         Expanded(
           child: Column(

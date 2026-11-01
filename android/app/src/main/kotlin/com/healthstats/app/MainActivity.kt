@@ -3,6 +3,9 @@ package com.healthstats.app
 import android.os.Bundle
 import androidx.activity.result.ActivityResultLauncher
 import androidx.health.connect.client.PermissionController
+import androidx.health.connect.client.contracts.ExerciseRouteRequestContract
+import androidx.health.connect.client.records.ExerciseRoute
+import kotlinx.coroutines.CompletableDeferred
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +38,8 @@ class MainActivity : FlutterFragmentActivity() {
     private val bridge by lazy { HealthBridge(this) }
     private var pendingPerm: Result? = null
     private lateinit var permLauncher: ActivityResultLauncher<Set<String>>
+    private lateinit var routeLauncher: ActivityResultLauncher<String>
+    private var routeWait: CompletableDeferred<ExerciseRoute?>? = null
     private val scope = CoroutineScope(Dispatchers.Main)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -45,6 +50,17 @@ class MainActivity : FlutterFragmentActivity() {
             pendingPerm?.success(granted.toList())
             pendingPerm = null
         }
+        routeLauncher = registerForActivityResult(ExerciseRouteRequestContract()) { route ->
+            routeWait?.complete(route)
+            routeWait = null
+        }
+    }
+
+    private suspend fun askRoute(id: String): ExerciseRoute? = withContext(Dispatchers.Main) {
+        val d = CompletableDeferred<ExerciseRoute?>()
+        routeWait = d
+        routeLauncher.launch(id)
+        d.await()
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -132,7 +148,7 @@ class MainActivity : FlutterFragmentActivity() {
                             when (call.method) {
                                 "granted" -> bridge.granted()
                                 "sessions" -> bridge.sessions(s, e)
-                                "route" -> bridge.route(a!!["id"] as String)
+                                "route" -> bridge.route(a!!["id"] as String, if (a["ask"] == true) { id: String -> askRoute(id) } else null)
                                 "heartRate" -> bridge.heartRate(s, e)
                                 "daily" -> bridge.daily(s, e)
                                 "sleep" -> bridge.sleep(s, e)

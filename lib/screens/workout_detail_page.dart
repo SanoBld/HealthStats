@@ -33,7 +33,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   void initState() {
     super.initState();
     final hs = HealthService.instance, w = widget.workout;
-    Future.wait([if (w.hasRoute) hs.route(w) else Future.value(<RoutePoint>[]), hs.heartRate(w)]).then((r) {
+    Future.wait([if (w.hasRoute) hs.route(w, ask: true) else Future.value(<RoutePoint>[]), hs.heartRate(w)]).then((r) {
       if (!mounted) return;
       setState(() { _route = r[0] as List<RoutePoint>; _hr = r[1] as List<(DateTime, int)>; _loading = false; });
     });

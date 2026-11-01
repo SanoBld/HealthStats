@@ -88,7 +88,7 @@ class _ChartsPageState extends State<ChartsPage> {
       final share = per.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
       return SafeArea(child: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
-        M3PageHeader(title: L.navCharts),
+        M3PageHeader(showBack: false, title: L.navCharts),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: M3SegmentedButton<_Period>(
           segments: [
             ButtonSegment(value: _Period.day, label: Text(isFr ? 'Jour' : 'Day')),

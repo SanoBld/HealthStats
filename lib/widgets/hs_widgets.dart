@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import '../models/health_models.dart';
 import '../app_state.dart';
+import 'm3_date_picker.dart';
 
 bool get isFr => localeNotifier.value == 'fr';
 String sportName(SportInfo s) => isFr ? s.fr : s.en;
@@ -11,6 +12,12 @@ String fmtDate(DateTime d) {
       : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return '${d.day} ${m[d.month - 1]} · ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 }
+String fmtDay(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+DateTime? parseBirth(String v) => v.isEmpty ? null : DateTime.tryParse(v);
+String birthToStr(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+Future<DateTime?> pickBirthDate(BuildContext c, DateTime? cur) => showM3DatePicker(c,
+    initial: cur ?? DateTime(2000, 1, 1), first: DateTime(1920), last: DateTime.now(),
+    title: isFr ? 'Date de naissance' : 'Birth date');
 String distLabel(double m) => unitsMetricNotifier.value ? '${fmtKm(m)} km' : '${(m / 1609.344).toStringAsFixed(2)} mi';
 
 class SectionTitle extends StatelessWidget {

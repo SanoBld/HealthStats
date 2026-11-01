@@ -29,7 +29,10 @@ class HealthBridge(private val ctx: Context) {
             HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
             HealthPermission.getReadPermission(SleepSessionRecord::class),
             HealthPermission.getReadPermission(WeightRecord::class),
+            HealthPermission.getReadPermission(HeightRecord::class),
+            HealthPermission.getReadPermission(SpeedRecord::class),
             ROUTE_PERM,
+            HISTORY_PERM,
         )
     }
 
@@ -117,17 +120,21 @@ class HealthBridge(private val ctx: Context) {
         return out
     }
 
-    /** GPS points of a session: list of [lat, lng, alt, timeMs]. */
-    suspend fun route(sessionId: String): List<List<Double>> {
-        val res = client.readRecord(ExerciseSessionRecord::class, sessionId)
-        val r = res.record.exerciseRouteResult
-        if (r !is ExerciseRouteResult.Data) return emptyList()
-        return r.exerciseRoute.route.map {
-            listOf(
-                it.latitude, it.longitude,
-                it.altitude?.inMeters ?: Double.NaN,
-                it.time.toEpochMilli().toDouble()
-            )
+    private fun pts(route: ExerciseRoute): List<List<Double>> = route.route.map {
+        listOf(
+            it.latitude, it.longitude,
+            it.altitude?.inMeters ?: Double.NaN,
+            it.time.toEpochMilli().toDouble()
+        )
+    }
+
+    /** GPS points of a session: list of [lat, lng, alt, timeMs]. [ask] runs the consent dialog if needed. */
+    suspend fun route(sessionId: String, ask: (suspend (String) -> ExerciseRoute?)?): List<List<Double>> {
+        val rec = client.readRecord(ExerciseSessionRecord::class, sessionId).record
+        return when (val r = rec.exerciseRouteResult) {
+            is ExerciseRouteResult.Data -> pts(r.exerciseRoute)
+            is ExerciseRouteResult.ConsentRequired -> ask?.invoke(sessionId)?.let { pts(it) } ?: emptyList()
+            else -> emptyList()
         }
     }
 

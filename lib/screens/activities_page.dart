@@ -23,7 +23,7 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
       final types = {for (final w in hs.workouts) w.type};
       final list = hs.workouts.where((w) => _type == null || w.type == _type).toList();
       return SafeArea(child: Column(children: [
-        M3PageHeader(title: L.navActivities, subtitle: '${list.length}'),
+        M3PageHeader(showBack: false, title: L.navActivities, subtitle: '${list.length}'),
         SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
           Padding(padding: const EdgeInsets.symmetric(horizontal: 4), child: ChoiceChip(label: Text(isFr ? 'Tout' : 'All'), selected: _type == null, onSelected: (_) => setState(() => _type = null))),
           for (final t in types) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),

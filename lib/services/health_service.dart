@@ -22,6 +22,9 @@ class HealthService extends ChangeNotifier {
   DateTime? lastSync;
   String? error;
   final Map<String, List<RoutePoint>> _routes = {};
+  Set<String> grantedPerms = {};
+  bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
+  bool get hasHistoryPerm => grantedPerms.any((p) => p.endsWith('READ_HEALTH_DATA_HISTORY'));
 
   Future<void> init() async {
     await _loadCache();
@@ -35,6 +38,7 @@ class HealthService extends ChangeNotifier {
       status = switch (s) { 'available' => HcStatus.available, 'update_required' => HcStatus.updateRequired, _ => HcStatus.unavailable };
       if (status == HcStatus.available) {
         final g = (await _ch.invokeMethod<List>('granted'))?.cast<String>() ?? [];
+        grantedPerms = g.toSet();
         permitted = g.any((p) => p.endsWith('READ_EXERCISE'));
       }
     } catch (e) { error = '$e'; }
@@ -44,6 +48,7 @@ class HealthService extends ChangeNotifier {
   Future<bool> requestPermissions() async {
     try {
       final g = (await _ch.invokeMethod<List>('requestPermissions'))?.cast<String>() ?? [];
+      grantedPerms = g.toSet();
       permitted = g.any((p) => p.endsWith('READ_EXERCISE'));
       notifyListeners();
       if (permitted) await sync();
@@ -74,16 +79,17 @@ class HealthService extends ChangeNotifier {
     loading = false; notifyListeners();
   }
 
-  Future<List<RoutePoint>> route(Workout w) async {
+  /// [ask]: if Health Connect wants a per-session consent, show its dialog.
+  Future<List<RoutePoint>> route(Workout w, {bool ask = false}) async {
     if (_routes.containsKey(w.id)) return _routes[w.id]!;
     try {
-      final r = (await _ch.invokeMethod<List>('route', {'id': w.id})) ?? [];
+      final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask})) ?? [];
       final pts = r.map((e) {
         final l = (e as List).cast<num>();
         return RoutePoint(LatLng(l[0].toDouble(), l[1].toDouble()), l[2].toDouble(),
             DateTime.fromMillisecondsSinceEpoch(l[3].toInt()));
       }).toList();
-      _routes[w.id] = pts;
+      if (pts.isNotEmpty) _routes[w.id] = pts;
       return pts;
     } catch (_) { return []; }
   }

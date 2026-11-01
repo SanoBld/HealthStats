@@ -7,8 +7,6 @@ final accentNotifier           = ValueNotifier<Color>(const Color(0xFFFF2020));
 final useDynamicColorNotifier  = ValueNotifier<bool>(false);
 final localeNotifier           = ValueNotifier<String>('fr');
 final displayNameNotifier      = ValueNotifier<String>('');
-final themeStyleNotifier       = ValueNotifier<String>('nothing'); // nothing | default
-final nothingAccentNotifier    = ValueNotifier<String>('classic'); // classic | mixed
 final oledModeNotifier         = ValueNotifier<bool>(false);
 final hapticFeedbackNotifier   = ValueNotifier<bool>(true);
 final navLabelNotifier         = ValueNotifier<bool>(true);
@@ -20,7 +18,7 @@ final minuteTickNotifier       = ValueNotifier<int>(0);
 final profileNameNotifier      = ValueNotifier<String>('');
 final profileHeightNotifier    = ValueNotifier<double>(0);   // cm
 final profileWeightNotifier    = ValueNotifier<double>(0);   // kg
-final profileBirthYearNotifier = ValueNotifier<int>(0);
+final profileBirthNotifier     = ValueNotifier<String>(''); // yyyy-MM-dd
 final profileSexNotifier       = ValueNotifier<String>('');  // m | f | x
 final stepGoalNotifier         = ValueNotifier<int>(10000);
 final weeklyGoalNotifier       = ValueNotifier<int>(3);      // séances/semaine
@@ -31,8 +29,6 @@ Future<void> loadAppState() async {
   final p = await SharedPreferences.getInstance();
   themeModeNotifier.value = ThemeMode.values[(p.getInt('hs_theme') ?? 0).clamp(0, 2)];
   localeNotifier.value = p.getString('hs_locale') ?? 'fr';
-  themeStyleNotifier.value = p.getString('hs_style') ?? 'nothing';
-  nothingAccentNotifier.value = p.getString('hs_nothing_accent') ?? 'classic';
   oledModeNotifier.value = p.getBool('hs_oled') ?? false;
   hapticFeedbackNotifier.value = p.getBool('hs_haptic') ?? true;
   navLabelNotifier.value = p.getBool('hs_navlabels') ?? true;
@@ -42,7 +38,7 @@ Future<void> loadAppState() async {
   profileNameNotifier.value = p.getString('hs_name') ?? '';
   profileHeightNotifier.value = p.getDouble('hs_height') ?? 0;
   profileWeightNotifier.value = p.getDouble('hs_weight') ?? 0;
-  profileBirthYearNotifier.value = p.getInt('hs_birth') ?? 0;
+  profileBirthNotifier.value = p.getString('hs_birthdate') ?? '';
   profileSexNotifier.value = p.getString('hs_sex') ?? '';
   stepGoalNotifier.value = p.getInt('hs_stepgoal') ?? 10000;
   weeklyGoalNotifier.value = p.getInt('hs_weeklygoal') ?? 3;
@@ -61,12 +57,12 @@ void bindPersistence(SharedPreferences p) {
       });
   themeModeNotifier.addListener(() => p.setInt('hs_theme', themeModeNotifier.value.index));
   accentNotifier.addListener(() => p.setInt('hs_accent', accentNotifier.value.toARGB32()));
-  b(localeNotifier, 'hs_locale'); b(themeStyleNotifier, 'hs_style');
-  b(nothingAccentNotifier, 'hs_nothing_accent'); b(oledModeNotifier, 'hs_oled');
+  b(localeNotifier, 'hs_locale');
+  b(oledModeNotifier, 'hs_oled');
   b(hapticFeedbackNotifier, 'hs_haptic'); b(navLabelNotifier, 'hs_navlabels');
   b(textScaleNotifier, 'hs_textscale'); b(appFontNotifier, 'hs_font');
   b(profileNameNotifier, 'hs_name'); b(profileHeightNotifier, 'hs_height');
-  b(profileWeightNotifier, 'hs_weight'); b(profileBirthYearNotifier, 'hs_birth');
+  b(profileWeightNotifier, 'hs_weight'); b(profileBirthNotifier, 'hs_birthdate');
   b(profileSexNotifier, 'hs_sex'); b(stepGoalNotifier, 'hs_stepgoal');
   b(weeklyGoalNotifier, 'hs_weeklygoal'); b(unitsMetricNotifier, 'hs_metric');
   b(onboardedNotifier, 'hs_onboarded');

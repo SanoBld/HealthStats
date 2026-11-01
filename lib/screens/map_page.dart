@@ -23,12 +23,12 @@ class _MapPageState extends State<MapPage> {
   Workout? _sel;
   int _stamp = -1;
 
-  Future<void> _load(List<Workout> ws) async {
+  Future<void> _load(List<Workout> ws, {bool ask = false}) async {
     setState(() => _loading = true);
     final hs = HealthService.instance;
     for (final w in ws.take(40)) {
       if (_tracks.containsKey(w.id)) continue;
-      final r = await hs.route(w);
+      final r = await hs.route(w, ask: ask);
       if (r.length > 1) _tracks[w.id] = r.map((p) => p.pos).toList();
       if (!mounted) return;
     }
@@ -54,7 +54,7 @@ class _MapPageState extends State<MapPage> {
       final shown = [for (final w in ws) if (_tracks.containsKey(w.id)) w];
       final all = [for (final w in shown) ..._tracks[w.id]!];
       return SafeArea(child: Column(children: [
-        M3PageHeader(title: L.navMap, subtitle: '${shown.length} ${isFr ? 'tracés' : 'routes'}'),
+        M3PageHeader(showBack: false, title: L.navMap, subtitle: '${shown.length} ${isFr ? 'tracés' : 'routes'}'),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: Row(children: [
           for (final d in [7, 30, 90, 3650]) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
               child: ChoiceChip(label: Text(d == 3650 ? (isFr ? 'Tout' : 'All') : '${d}j'), selected: _days == d, onSelected: (_) => setState(() { _days = d; _sel = null; }))),
@@ -62,7 +62,15 @@ class _MapPageState extends State<MapPage> {
         ])),
         const SizedBox(height: 8),
         Expanded(child: shown.isEmpty && !_loading
-            ? M3EmptyState(icon: Icons.map_rounded, message: isFr ? 'Aucun tracé GPS sur cette période' : 'No GPS routes in this period')
+            ? Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                M3EmptyState(icon: Icons.map_rounded, message: ws.isEmpty
+                    ? (isFr ? 'Aucun tracé GPS sur cette période' : 'No GPS routes in this period')
+                    : (isFr ? 'Les tracés doivent être autorisés' : 'Routes need your permission')),
+                if (ws.isNotEmpty) FilledButton.icon(
+                    onPressed: () => _load(ws, ask: true),
+                    icon: const Icon(Icons.route_rounded),
+                    label: Text(isFr ? 'Autoriser et charger les tracés' : 'Allow and load routes')),
+              ])
             : Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: ClipRRect(borderRadius: BorderRadius.circular(16), child: FlutterMap(
                 mapController: _ctrl,
                 options: MapOptions(
