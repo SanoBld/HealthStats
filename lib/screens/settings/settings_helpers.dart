@@ -354,6 +354,9 @@ class RestartBanner extends StatelessWidget {
   }
 }
 
+String colorToHex(Color c) =>
+    (c.toARGB32() & 0xFFFFFF).toRadixString(16).padLeft(6, '0').toUpperCase();
+
 // ── ColorPickerDialog (public) ────────────────────────────────────────────────
 
 class ColorPickerDialog extends StatefulWidget {

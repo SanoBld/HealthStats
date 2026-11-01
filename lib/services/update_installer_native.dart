@@ -2,7 +2,6 @@ import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
-import '../l10n/extra_strings.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'update_service.dart';
 
@@ -73,7 +72,7 @@ Future<String> installUpdate(String url, DownloadKind kind, void Function(double
 }
 
 /// Downloads a release file and puts it in the default Downloads folder
-/// (no browser, no install). Returns 'saved|<where>' or 'fallback'.
+/// (no browser, no install). Returns `saved|where` or 'fallback'.
 Future<String> saveDownload(String url, String fileName, void Function(double?) onProgress) async {
   if (Platform.isIOS) return 'fallback';
   final file = await _fetch(url, fileName, fileName, onProgress);

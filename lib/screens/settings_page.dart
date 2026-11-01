@@ -1,6 +1,5 @@
 // Settings (same structure as LastStats: sections, rows, sheets).
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../l10n/l10n.dart';
 import '../services/health_service.dart';

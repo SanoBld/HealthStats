@@ -297,7 +297,7 @@ class _TrendPainter extends CustomPainter {
 
 class WeekChart extends StatefulWidget {
   final Map<int, int> data;
-  const WeekChart({required this.data});
+  const WeekChart({super.key, required this.data});
   @override
   State<WeekChart> createState() => WeekChartState();
 }
@@ -435,7 +435,7 @@ class ShareDonut extends StatelessWidget {
   final int Function(dynamic) getPlays;
   final void Function(dynamic)? onTap;
   final Color? textColor;
-  const ShareDonut({required this.items, required this.getLabel,
+  const ShareDonut({super.key, required this.items, required this.getLabel,
       required this.getPlays, this.onTap, this.textColor});
 
   @override
@@ -565,9 +565,6 @@ void _paintText(Canvas c, String text, Offset o,
   final dx = align == 0 ? 0.0 : (align == 1 ? -tp.width / 2 : -tp.width);
   tp.paint(c, Offset(o.dx + dx, o.dy - tp.height / 2));
 }
-
-Color _onColor(Color c) =>
-    ThemeData.estimateBrightnessForColor(c) == Brightness.dark ? Colors.white : Colors.black;
 
 List<Color> _themePalette(ColorScheme s) {
   final p = HSLColor.fromColor(s.primary);

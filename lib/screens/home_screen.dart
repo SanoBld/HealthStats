@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../l10n/l10n.dart';
 import '../theme/m3_motion.dart';
-import '../widgets/scroll_status_bar.dart';
 import 'activities_page.dart';
 import 'charts_page.dart';
 import 'dashboard_page.dart';

@@ -54,10 +54,10 @@ class HealthStatsApp extends StatelessWidget {
           } else {
             final dyn = useDynamicColorNotifier.value;
             final seed = accentNotifier.value;
-            ColorScheme ls = (dyn && lightDyn != null) ? lightDyn.harmonized() : ColorScheme.fromSeed(seed: seed);
+            ColorScheme ls = (dyn && lightDyn != null) ? lightDyn.harmonized() : ColorScheme.fromSeed(seedColor: seed);
             ColorScheme ds = (dyn && darkDyn != null)
                 ? darkDyn.harmonized()
-                : ColorScheme.fromSeed(seed: seed, brightness: Brightness.dark);
+                : ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
             if (oledModeNotifier.value) {
               ds = ds.copyWith(surface: Colors.black, surfaceContainerLowest: Colors.black,
                   surfaceContainerLow: const Color(0xFF080808), surfaceContainer: const Color(0xFF0D0D0D));

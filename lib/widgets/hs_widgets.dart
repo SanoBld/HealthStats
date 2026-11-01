@@ -1,7 +1,6 @@
 // Small shared HealthStats components (LastStats card style).
 import 'package:flutter/material.dart';
 import '../models/health_models.dart';
-import '../l10n/l10n.dart';
 import '../app_state.dart';
 
 bool get isFr => localeNotifier.value == 'fr';
@@ -24,7 +23,7 @@ class SectionTitle extends StatelessWidget {
           Expanded(child: Text(text.toUpperCase(),
               style: Theme.of(c).textTheme.labelMedium?.copyWith(
                   letterSpacing: 1.2, color: Theme.of(c).colorScheme.onSurfaceVariant, fontWeight: FontWeight.w700))),
-          if (trailing != null) trailing!,
+          ?trailing,
         ]),
       );
 }

@@ -1,7 +1,6 @@
 // Workout detail: GPS map, stats, heart-rate curve, elevation, strength sets.
 import 'package:flutter/material.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
 import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
