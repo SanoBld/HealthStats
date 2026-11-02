@@ -35,6 +35,7 @@ class HealthService extends ChangeNotifier {
   final Map<String, List<(DateTime, int)>> _impHr = {};
   bool importing = false;
   int get importCount => _imports.length;
+  final Map<String, List<String>> _alt = {}; // merged duplicates: main id -> other ids
   final Set<String> _statsOk = {}; // sessions whose stats are already saved
   Set<String> grantedPerms = {};
   bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
@@ -202,35 +203,47 @@ class HealthService extends ChangeNotifier {
   /// [ask]: if Health Connect wants a per-session consent, show its dialog.
   /// [maxPoints] > 0 = small route (map tab), not kept in memory.
   Future<List<RoutePoint>> route(Workout w, {bool ask = false, int maxPoints = 0}) async {
-    final imp = _impRoutes[w.id];
-    if (imp != null) {
-      if (maxPoints <= 0 || imp.length <= maxPoints) return imp;
-      final step = (imp.length / maxPoints).ceil();
-      return [for (var i = 0; i < imp.length; i += step) imp[i]];
+    final ids = [w.id, ...(_alt[w.id] ?? const <String>[])];
+    for (final id in ids) {
+      final imp = _impRoutes[id];
+      if (imp != null) {
+        if (maxPoints <= 0 || imp.length <= maxPoints) return imp;
+        final step = (imp.length / maxPoints).ceil();
+        return [for (var i = 0; i < imp.length; i += step) imp[i]];
+      }
     }
-    if (maxPoints == 0 && _routes.containsKey(w.id)) return _routes[w.id]!;
-    try {
-      final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask, 'max': maxPoints}).timeout(ask ? const Duration(minutes: 3) : const Duration(seconds: 40))) ?? [];
-      final pts = r.map((e) {
-        final l = (e as List).cast<num>();
-        return RoutePoint(LatLng(l[0].toDouble(), l[1].toDouble()), l[2].toDouble(),
-            DateTime.fromMillisecondsSinceEpoch(l[3].toInt()));
-      }).toList();
-      routeError = null;
-      if (pts.isNotEmpty && maxPoints == 0) _routes[w.id] = pts;
-      return pts;
-    } catch (e) {
-      final m = '$e';
-      final fr = localeNotifier.value == 'fr';
-      routeError = m.contains('no_route')
-          ? (fr ? 'Health Connect n’a aucun tracé GPS pour cette séance : l’app qui l’a enregistrée ne l’a pas envoyé.'
-                  : 'Health Connect has no GPS route for this session: the app that recorded it did not send one.')
-          : m.contains('consent_denied')
-              ? (fr ? 'L’accès au tracé a été refusé ou fermé. Appuie sur le bouton et choisis « Autoriser ».'
-                      : 'Route access was refused or closed. Tap the button and choose “Allow”.')
-              : m;
-      return [];
+    if (maxPoints == 0) { for (final id in ids) { if (_routes.containsKey(id)) return _routes[id]!; } }
+    Object? lastErr;
+    for (final id in ids) {
+      if (id.startsWith('imp_')) continue;
+      try {
+        final r = (await _ch.invokeMethod<List>('route', {'id': id, 'ask': ask, 'max': maxPoints}).timeout(ask ? const Duration(minutes: 3) : const Duration(seconds: 40))) ?? [];
+        final pts = r.map((e) {
+          final l = (e as List).cast<num>();
+          return RoutePoint(LatLng(l[0].toDouble(), l[1].toDouble()), l[2].toDouble(),
+              DateTime.fromMillisecondsSinceEpoch(l[3].toInt()));
+        }).toList();
+        if (pts.length > 1) {
+          routeError = null;
+          if (maxPoints == 0) _routes[w.id] = pts;
+          return pts;
+        }
+        lastErr = 'no_route';
+      } catch (e) {
+        lastErr = e;
+        if ('$e'.contains('consent_denied')) break;
+      }
     }
+    final m = '$lastErr';
+    final fr = localeNotifier.value == 'fr';
+    routeError = m.contains('no_route')
+        ? (fr ? 'Health Connect n’a aucun tracé GPS pour cette séance : l’app qui l’a enregistrée ne l’a pas envoyé.'
+                : 'Health Connect has no GPS route for this session: the app that recorded it did not send one.')
+        : m.contains('consent_denied')
+            ? (fr ? 'L’accès au tracé a été refusé ou fermé. Appuie sur le bouton et choisis « Autoriser ».'
+                    : 'Route access was refused or closed. Tap the button and choose “Allow”.')
+            : m;
+    return [];
   }
 
   /// Loads small tracks for the map (6 at a time, small routes), saves them on disk.
@@ -336,8 +349,9 @@ class HealthService extends ChangeNotifier {
   Set<String> _applyImports() {
     final matched = <String>{};
     _impRoutes.clear(); _impHr.clear();
-    if (_imports.isEmpty) { workouts = workouts.where((w) => !w.id.startsWith('imp_')).toList(); return matched; }
-    final out = workouts.where((w) => !w.id.startsWith('imp_')).toList();
+    final base = _dedupe(workouts.where((w) => !w.id.startsWith('imp_')).toList());
+    if (_imports.isEmpty) { workouts = base..sort((x, y) => y.start.compareTo(x.start)); return matched; }
+    final out = base;
     for (final a in _imports) {
       final s = DateTime.fromMillisecondsSinceEpoch((a['start'] as num).toInt());
       final route = [for (final p in (a['route'] as List)) RoutePoint(LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()),
@@ -371,6 +385,52 @@ class HealthService extends ChangeNotifier {
     return matched;
   }
 
+  // ── Merge duplicates (same activity written by several apps) ──
+  // Lower rank = closer to the original app. Origin app first, then Google Fit, Strava, Intervals, files.
+  int _rank(String s) {
+    if (s == 'com.strava') return 3;
+    if (s == 'intervals') return 4;
+    if (s == 'import') return 5;
+    if (s.isEmpty || s == 'com.google.android.apps.fitness' || s == 'com.google.android.apps.healthdata') return 2;
+    return 0;
+  }
+  int _family(int t) => (t == 56 || t == 57) ? 1 : (t == 79 || t == 37) ? 2 : (t == 8 || t == 9) ? 3 : (t == 74 || t == 73) ? 4 : t;
+  bool _sameSport(Workout a, Workout b) => a.type == 0 || b.type == 0 || _family(a.type) == _family(b.type);
+  int _score(Workout w) => (w.hasRoute ? 4 : 0) + (w.distanceM > 0 ? 2 : 0) + (w.hrAvg > 0 ? 2 : 0) + (w.kcal > 0 ? 1 : 0);
+
+  /// Groups sessions that start within 10 min with the same sport, keeps the best source and fills the gaps from the others.
+  List<Workout> _dedupe(List<Workout> list) {
+    _alt.clear();
+    final sorted = [...list]..sort((a, b) => a.start.compareTo(b.start));
+    final groups = <List<Workout>>[];
+    for (final w in sorted) {
+      List<Workout>? g;
+      for (var i = groups.length - 1; i >= 0 && i >= groups.length - 6; i--) {
+        if (groups[i].any((x) => x.start.difference(w.start).inMinutes.abs() <= 10 && _sameSport(x, w))) { g = groups[i]; break; }
+      }
+      if (g == null) { groups.add([w]); } else { g.add(w); }
+    }
+    return [for (final g in groups) g.length == 1 ? g.first : _mergeGroup(g)];
+  }
+
+  Workout _mergeGroup(List<Workout> g) {
+    g.sort((a, b) { final r = _rank(a.source).compareTo(_rank(b.source)); return r != 0 ? r : _score(b).compareTo(_score(a)); });
+    final p = g.first;
+    double pick(double Function(Workout) f) { for (final w in g) { final v = f(w); if (v > 0) return v; } return 0; }
+    final steps = g.map((w) => w.steps).firstWhere((s) => s > 0, orElse: () => 0);
+    _alt[p.id] = [for (final w in g.skip(1)) w.id];
+    return Workout(
+      id: p.id, type: p.type != 0 ? p.type : g.firstWhere((w) => w.type != 0, orElse: () => p).type,
+      title: g.map((w) => w.title).firstWhere((t) => t.isNotEmpty, orElse: () => ''),
+      notes: g.map((w) => w.notes).firstWhere((t) => t.isNotEmpty, orElse: () => ''),
+      source: p.source, start: p.start, end: p.end, hasRoute: g.any((w) => w.hasRoute),
+      distanceM: pick((w) => w.distanceM), activeKcal: pick((w) => w.activeKcal), totalKcal: pick((w) => w.totalKcal),
+      steps: steps, hrAvg: pick((w) => w.hrAvg), hrMax: pick((w) => w.hrMax), hrMin: pick((w) => w.hrMin),
+      segments: g.map((w) => w.segments).firstWhere((s) => s.isNotEmpty, orElse: () => const []));
+  }
+
+  bool isNoTrack(String id) => _noTrack.contains(id);
+
   Future<void> _saveImports() async {
     try { await (await _f('hs_imports.json')).writeAsString(jsonEncode(_imports)); } catch (_) {}
   }
@@ -388,7 +448,22 @@ class HealthService extends ChangeNotifier {
     } finally { importing = false; notifyListeners(); }
   }
 
-  bool _knownStart(int ms) => _imports.any((a) => ((a['start'] as num).toInt() - ms).abs() < 120000);
+  // A start is "known" when an import within 10 min already has a route (no need to read it again).
+  bool _knownStart(int ms) => _imports.any((a) => ((a['start'] as num).toInt() - ms).abs() <= 600000 && (a['route'] as List).length > 1);
+
+  /// Fills the empty parts of [ex] from [nw] (same activity, other source). Returns true if something changed.
+  bool _mergeImport(Map<String, dynamic> ex, Map<String, dynamic> nw) {
+    var ch = false;
+    if ((ex['route'] as List).length < 2 && (nw['route'] as List).length > 1) { ex['route'] = nw['route']; ch = true; }
+    if ((ex['hr'] as List).isEmpty && (nw['hr'] as List).isNotEmpty) {
+      ex['hr'] = nw['hr']; ex['hrAvg'] = nw['hrAvg']; ex['hrMax'] = nw['hrMax']; ex['hrMin'] = nw['hrMin']; ch = true;
+    }
+    for (final k in ['distanceM', 'kcal']) {
+      if (((ex[k] as num?) ?? 0) <= 0 && ((nw[k] as num?) ?? 0) > 0) { ex[k] = nw[k]; ch = true; }
+    }
+    if ('${ex['title'] ?? ''}'.isEmpty && '${nw['title'] ?? ''}'.isNotEmpty) { ex['title'] = nw['title']; ch = true; }
+    return ch;
+  }
 
   /// Adds parsed activities (skipping ones whose start is within 2 min of an existing import).
   /// Returns (added, matched with an existing session, already known).
@@ -396,7 +471,9 @@ class HealthService extends ChangeNotifier {
     var added = 0, already = 0;
     final fresh = <String>{};
     for (final a in acts) {
-      if (_knownStart((a['start'] as num).toInt())) { already++; continue; }
+      final ms = (a['start'] as num).toInt();
+      final ei = _imports.indexWhere((x) => ((x['start'] as num).toInt() - ms).abs() <= 600000);
+      if (ei >= 0) { _mergeImport(_imports[ei], a); already++; continue; }
       final id = 'imp_${a['start']}';
       a['id'] = id; _imports.add(a); fresh.add(id); added++;
     }

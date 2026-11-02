@@ -51,6 +51,23 @@ class IntervalsService {
     return fr ? 'Erreur Intervals.icu ($code).' : 'Intervals.icu error ($code).';
   }
 
+  /// Quick test of the key: GET the athlete. Returns (ok, athlete name, error text).
+  static Future<(bool, String?, String?)> check(String key, String athlete, bool fr) async {
+    try {
+      final r = await http.get(Uri.parse('$_base/athlete/$athlete'), headers: _headers(key)).timeout(const Duration(seconds: 20));
+      final e = _httpError(r.statusCode, fr);
+      if (e != null) return (false, null, e);
+      String? name;
+      try {
+        final j = jsonDecode(utf8.decode(r.bodyBytes));
+        final m = j is Map ? (j['athlete'] is Map ? j['athlete'] as Map : j) : null;
+        final n = '${m?['name'] ?? m?['firstname'] ?? ''}'.trim();
+        if (n.isNotEmpty) name = n;
+      } catch (_) {}
+      return (true, name, null);
+    } catch (_) { return (false, null, fr ? 'Pas de connexion à Intervals.icu.' : 'Cannot reach Intervals.icu.'); }
+  }
+
   /// Lists the activities of the last [days] days, then reads GPS + heart rate of the ones not known yet.
   static Future<IntervalsResult> fetch({required String key, required String athlete, required int days, required bool fr,
       required bool Function(int startMs) isKnown, void Function(String stage, double progress)? onStage}) async {

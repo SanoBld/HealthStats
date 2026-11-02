@@ -6,7 +6,6 @@ import '../app_state.dart';
 import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
-import '../widgets/skeleton.dart' show M3LoadingIndicator;
 
 /// Map tiles: OpenStreetMap (no API key). In dark mode the tiles are inverted.
 Widget hsTileLayer(BuildContext c) {
@@ -31,9 +30,9 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   List<RoutePoint> _route = [];
   List<(DateTime, int)> _hr = [];
   List<(DateTime, double)> _spd = [], _pow = [];
-  bool _loading = true;
   bool _routeTried = false; // consent dialog already shown once
   LatLng? _cur; // point shown on the map while touching a chart
+  List<LatLng> _preview = []; // small saved route, shown at once while the full one loads
 
   @override
   void initState() {
@@ -53,23 +52,18 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   @override
   void dispose() { HealthService.instance.removeListener(_permWatch); super.dispose(); }
 
+  // Silent load (no spinner, no dialog): each block appears by itself when ready.
   void _load() {
     final hs = HealthService.instance, w = widget.workout;
-    setState(() => _loading = true);
-    final wantRoute = w.hasRoute || w.sport.outdoor;
-    Future.wait([
-      wantRoute ? hs.route(w, ask: true) : Future.value(<RoutePoint>[]),
-      hs.heartRate(w),
-      hs.samples('speed', w),
-      hs.samples('power', w),
-    ]).then((r) {
-      if (!mounted) return;
-      setState(() {
-        _route = r[0] as List<RoutePoint>; _hr = r[1] as List<(DateTime, int)>;
-        _spd = r[2] as List<(DateTime, double)>; _pow = r[3] as List<(DateTime, double)>;
-        _loading = false; _routeTried = true;
-      });
-    });
+    final pre = hs.tracks[w.id];
+    if (_route.isEmpty && pre != null && pre.length > 1) _preview = pre;
+    var pending = 4;
+    void done() { pending--; if (pending == 0 && mounted) setState(() => _routeTried = true); }
+    void set(VoidCallback f) { if (mounted) setState(f); }
+    (w.hasRoute || w.sport.outdoor ? hs.route(w) : Future.value(<RoutePoint>[])).then((r) { set(() => _route = r); done(); });
+    hs.heartRate(w).then((r) { set(() => _hr = r); done(); });
+    hs.samples('speed', w).then((r) { set(() => _spd = r); done(); });
+    hs.samples('power', w).then((r) { set(() => _pow = r); done(); });
   }
 
   String _clock(Duration d) => fmtClock(d);
@@ -139,7 +133,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   Widget build(BuildContext context) {
     final w = widget.workout, sp = w.sport, col = sportColor(context, sp);
     final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
-    final pts = _route.map((p) => p.pos).toList();
+    final pts = _route.length > 1 ? _route.map((p) => p.pos).toList() : _preview;
     final alts = _route.map((p) => p.alt).where((a) => !a.isNaN).toList();
     // recorded speed curve if the app wrote one, else computed from the GPS route
     final recSpeed = _spd.length > 5;
@@ -150,36 +144,28 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
     return Scaffold(
       appBar: AppBar(title: Text(w.title.isNotEmpty ? w.title : sportName(sp))),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
-        if (pts.length > 1) SizedBox(height: 280, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: ClipRRect(borderRadius: BorderRadius.circular(16),
-            child: FlutterMap(
-              options: MapOptions(initialCameraFit: CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: const EdgeInsets.all(36))),
-              children: [
-                hsTileLayer(context),
-                PolylineLayer(polylines: [Polyline(points: pts, strokeWidth: 5, color: col, borderStrokeWidth: 2, borderColor: Colors.black54)]),
-                MarkerLayer(markers: [
-                  Marker(point: pts.first, width: 18, height: 18, child: const _Dot(Colors.green)),
-                  Marker(point: pts.last, width: 18, height: 18, child: const _Dot(Colors.red)),
-                  if (_cur != null) Marker(point: _cur!, width: 26, height: 26, child: _Dot(col)),
-                ]),
-                const SimpleAttributionWidget(source: Text('OpenStreetMap')),
-              ],
-            ))))
-        else if (_loading && (w.hasRoute || sp.outdoor)) const SizedBox(height: 120, child: Center(child: M3LoadingIndicator(size: 56)))
-        else if (_routeTried && (w.hasRoute || sp.outdoor)) AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Padding(
-            key: ValueKey(_loading), padding: const EdgeInsets.all(16), child: _loading
-              ? const SizedBox(height: 56, child: Center(child: M3LoadingIndicator(size: 40)))
-              : Column(children: [
-                  if (_routeTried) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(
-                      HealthService.instance.routeError ?? (isFr ? 'Aucun tracé lu pour cette séance.' : 'No route read for this session.'),
-                      textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: s.onSurfaceVariant))),
-                  if (HealthService.instance.routeError?.contains('aucun') != true && HealthService.instance.routeError?.contains('no GPS') != true) FilledButton.icon(
-                    onPressed: () {
-                      setState(() => _loading = true);
-                      HealthService.instance.route(w, ask: true).then((r) { if (mounted) setState(() { _route = r; _loading = false; _routeTried = true; }); });
-                    },
-                    icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Réessayer' : 'Try again')),
-                ]))),
+        AnimatedSize(duration: const Duration(milliseconds: 300), curve: Curves.easeOutCubic, alignment: Alignment.topCenter,
+          child: pts.length > 1 ? SizedBox(height: 280, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: ClipRRect(borderRadius: BorderRadius.circular(16),
+              child: FlutterMap(
+                options: MapOptions(initialCameraFit: CameraFit.bounds(bounds: LatLngBounds.fromPoints(pts), padding: const EdgeInsets.all(36))),
+                children: [
+                  hsTileLayer(context),
+                  PolylineLayer(polylines: [Polyline(points: pts, strokeWidth: 5, color: col, borderStrokeWidth: 2, borderColor: Colors.black54)]),
+                  MarkerLayer(markers: [
+                    Marker(point: pts.first, width: 18, height: 18, child: const _Dot(Colors.green)),
+                    Marker(point: pts.last, width: 18, height: 18, child: const _Dot(Colors.red)),
+                    if (_cur != null) Marker(point: _cur!, width: 26, height: 26, child: _Dot(col)),
+                  ]),
+                  const SimpleAttributionWidget(source: Text('OpenStreetMap')),
+                ],
+              )))) : const SizedBox(width: double.infinity)),
+        // No GPS = nothing shown. Only a small button when Health Connect may hold a route we are not allowed to read yet.
+        if (pts.length <= 1 && _routeTried && w.hasRoute && !HealthService.instance.hasRoutePerm) Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Align(alignment: Alignment.centerLeft, child: TextButton.icon(
+                onPressed: () => HealthService.instance.route(w, ask: true).then((r) { if (mounted) setState(() => _route = r); }),
+                icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Afficher le tracé' : 'Show route')))),
         Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 4), child: Row(children: [
           Icon(sp.icon, color: col), const SizedBox(width: 8),
           Expanded(child: Text('${sportName(sp)} · ${fmtDate(w.start)}', style: t.titleMedium)),

@@ -20,6 +20,7 @@ class _IntervalsPageState extends State<IntervalsPage> {
   final _key = TextEditingController(), _id = TextEditingController(text: '0');
   bool _connected = false, _confirm = false;
   DateTime? _last;
+  bool _checking = false; String? _okName, _checkErr;
 
   @override
   void initState() {
@@ -28,16 +29,24 @@ class _IntervalsPageState extends State<IntervalsPage> {
       final l = await IntervalsService.lastSync();
       if (!mounted) return;
       setState(() { _connected = c != null; _last = l; if (c != null) { _key.text = c.$1; _id.text = c.$2; } });
+      if (c != null) _verify();
     });
   }
 
   @override
   void dispose() { _key.dispose(); _id.dispose(); super.dispose(); }
 
+  Future<void> _verify() async {
+    setState(() { _checking = true; _checkErr = null; });
+    final r = await IntervalsService.check(_key.text.trim(), _id.text.trim().isEmpty ? '0' : _id.text.trim(), isFr);
+    if (mounted) setState(() { _checking = false; _okName = r.$2; _checkErr = r.$1 ? null : r.$3; });
+  }
+
   Future<void> _connect() async {
     if (_key.text.trim().isEmpty) return;
     await IntervalsService.save(_key.text, _id.text);
     setState(() => _connected = true);
+    _verify();
     final ok = await HealthService.instance.syncIntervals();
     final l = await IntervalsService.lastSync();
     if (mounted) setState(() { _last = l; if (!ok && HealthService.instance.intervalsError != null) _connected = true; });
@@ -57,6 +66,18 @@ class _IntervalsPageState extends State<IntervalsPage> {
                    : 'Free service that collects your workouts from your watch or sports app. HealthStats reads your activities, heart rate and GPS routes, '
                      'so the map no longer needs Health Connect consent.',
               style: t.bodyMedium?.copyWith(color: s.onSurfaceVariant))),
+          if (_connected) Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 12), child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250), padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(color: _checkErr != null ? s.errorContainer : (_checking ? s.surfaceContainerHigh : s.primaryContainer), borderRadius: BorderRadius.circular(20)),
+              child: Row(children: [
+                Icon(_checkErr != null ? Icons.error_outline_rounded : (_checking ? Icons.sync_rounded : Icons.check_circle_rounded),
+                    color: _checkErr != null ? s.onErrorContainer : s.onPrimaryContainer),
+                const SizedBox(width: 12),
+                Expanded(child: Text(
+                    _checking ? (isFr ? 'Vérification de la connexion…' : 'Checking the connection…')
+                        : _checkErr ?? (isFr ? 'Connecté, ça fonctionne${_okName != null ? ' · $_okName' : ''}' : 'Connected and working${_okName != null ? ' · $_okName' : ''}'),
+                    style: t.bodyLarge?.copyWith(color: _checkErr != null ? s.onErrorContainer : s.onPrimaryContainer))),
+              ]))),
           SettingsSection(label: isFr ? 'Connexion' : 'Connection', children: [
             SettingTile(leading: const Icon(Icons.key_rounded), title: Text(isFr ? '1. Crée ta clé API' : '1. Create your API key'),
                 subtitle: Text(isFr ? 'intervals.icu › Paramètres › tout en bas : « Paramètres pour les développeurs » › Créer une clé API.'

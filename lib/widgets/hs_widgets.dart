@@ -173,7 +173,7 @@ class WorkoutCard extends StatelessWidget {
               ])),
               if (HealthService.instance.tracks[w.id] != null)
                 SizedBox(width: 64, height: 44, child: CustomPaint(painter: _ThumbPainter(HealthService.instance.tracks[w.id]!, col)))
-              else if (w.hasRoute) Icon(Icons.route_rounded, size: 18, color: s.onSurfaceVariant),
+              else if (w.hasRoute && !HealthService.instance.isNoTrack(w.id)) Icon(Icons.route_rounded, size: 18, color: s.onSurfaceVariant),
               Icon(Icons.chevron_right_rounded, color: s.onSurfaceVariant),
             ]),
       ),
