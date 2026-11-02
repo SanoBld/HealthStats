@@ -56,7 +56,7 @@ class _MapPageState extends State<MapPage> {
         final loading = hs.trackBusy || (hs.loading && ws.isEmpty);
         return SafeArea(child: Column(children: [
           M3PageHeader(showBack: false, title: L.navMap, subtitle: '${shown.length} ${isFr ? 'tracés' : 'routes'}'),
-          SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+          ClipRect(child: SizedBox(height: 52, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(12, 4, 12, 8), children: [
             FilterChipButton(
               label: _type == null ? (isFr ? 'Tous les sports' : 'All sports') : sportName(sportOf(_type!)),
               active: _type != null,
@@ -73,7 +73,7 @@ class _MapPageState extends State<MapPage> {
             for (final d in [7, 30, 90, 365, 3650]) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: M3Chip(label: Text(d == 3650 ? (isFr ? 'Tout' : 'All') : d == 365 ? (isFr ? '1 an' : '1y') : '${d}j'),
                     selected: _days == d, onSelected: (_) => setState(() { _days = d; _sel = null; _fitted = -1; }))),
-          ])),
+          ]))),
           if (hs.trackBusy) Padding(padding: const EdgeInsets.fromLTRB(20, 2, 20, 4), child: M3WavyProgress(value: hs.trackProgress, height: 10)),
           const SizedBox(height: 4),
           Expanded(child: shown.isEmpty
@@ -99,7 +99,7 @@ class _MapPageState extends State<MapPage> {
                       for (final w in shown) if (_sel == null || _sel!.id == w.id) Polyline(points: hs.tracks[w.id]!, strokeWidth: _sel == null ? 4 : 6,
                           color: sportColor(ctx, w.sport).withValues(alpha: 0.95)),
                     ]),
-                    const SimpleAttributionWidget(source: Text('OpenStreetMap')),
+                    hsAttribution(),
                   ])))),
           SizedBox(height: 92, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), children: [
             for (final w in shown) Padding(padding: const EdgeInsets.only(right: 8), child: GestureDetector(

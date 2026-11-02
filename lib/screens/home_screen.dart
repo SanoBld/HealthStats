@@ -37,10 +37,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    final bg = Theme.of(context).colorScheme.surface;
     final pages = [
       DashboardPage(onOpenTab: (i) => setState(() => _idx = i)),
       const ActivitiesPage(), const MapPage(), const SearchPage(), const ChartsPage(),
-    ];
+    ].map((p) => ClipRect(child: ColoredBox(color: bg, child: p))).toList();
     return Scaffold(
       body: M3FadeThroughStack(index: _idx, children: pages),
       bottomNavigationBar: NavigationBar(

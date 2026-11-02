@@ -331,6 +331,26 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return []; }
   }
 
+  /// Last night (sessions grouped): bed time, wake time, minutes asleep.
+  Future<({DateTime start, DateTime end, int minutes})?> lastSleep() async {
+    try {
+      final r = (await _ch.invokeMethod<List>('sleep', {
+            'start': DateTime.now().subtract(const Duration(days: 4)).millisecondsSinceEpoch,
+            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
+      final ss = <(DateTime, DateTime)>[];
+      for (final e in r) {
+        final m = e as Map;
+        ss.add((DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()), DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt())));
+      }
+      if (ss.isEmpty) return null;
+      ss.sort((a, b) => b.$2.compareTo(a.$2));
+      final end = ss.first.$2;
+      final g = ss.where((x) => end.difference(x.$2).inHours < 14).toList();
+      final st = g.map((x) => x.$1).reduce((a, b) => a.isBefore(b) ? a : b);
+      return (start: st, end: end, minutes: g.fold<int>(0, (a, x) => a + x.$2.difference(x.$1).inMinutes));
+    } catch (_) { return null; }
+  }
+
   Future<List<(DateTime, double)>> weights() async {
     try {
       final r = (await _ch.invokeMethod<List>('weight', {

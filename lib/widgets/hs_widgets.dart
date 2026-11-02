@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 // Small shared HealthStats components (LastStats card style).
 import 'package:flutter/material.dart';
 import 'package:latlong2/latlong.dart' show LatLng;
@@ -100,11 +101,11 @@ double spdConv(double kmh) => unitsMetricNotifier.value ? kmh : kmh * 0.621371;
 String get spdUnit => unitsMetricNotifier.value ? 'km/h' : 'mph';
 
 class SectionTitle extends StatelessWidget {
-  final String text; final Widget? trailing;
-  const SectionTitle(this.text, {super.key, this.trailing});
+  final String text; final Widget? trailing; final bool compact;
+  const SectionTitle(this.text, {super.key, this.trailing, this.compact = false});
   @override
   Widget build(BuildContext c) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+        padding: EdgeInsets.fromLTRB(20, compact ? 10 : 24, 20, compact ? 4 : 8),
         child: Row(children: [
           Expanded(child: Text(text.toUpperCase(),
               style: Theme.of(c).textTheme.labelMedium?.copyWith(
@@ -252,7 +253,32 @@ class ScrubChart extends StatefulWidget {
   State<ScrubChart> createState() => _ScrubChartState();
 }
 
-class _ScrubChartState extends State<ScrubChart> {
+class _ScrubChartState extends State<ScrubChart> with SingleTickerProviderStateMixin {
+  late final AnimationController _anim = AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
+  @override
+  void dispose() { _anim.dispose(); super.dispose(); }
+  /// Bucket-average to at most [maxPts] points, then light moving average: no jitter.
+  (List<double>, double) _down(List<double> a, int maxPts) {
+    var out = a; var step = 1.0;
+    if (a.length > maxPts && maxPts > 8) {
+      step = a.length / maxPts; out = [];
+      for (var k = 0; k < maxPts; k++) {
+        final s0 = (k * step).floor(), e0 = ((k + 1) * step).floor().clamp(s0 + 1, a.length);
+        var sum = 0.0; for (var i = s0; i < e0; i++) { sum += a[i]; }
+        out.add(sum / (e0 - s0));
+      }
+    }
+    if (out.length > 30) {
+      final sm = <double>[];
+      for (var i = 0; i < out.length; i++) {
+        final lo = i < 2 ? 0 : i - 2, hi = i + 2 > out.length - 1 ? out.length - 1 : i + 2;
+        var sum = 0.0; for (var k = lo; k <= hi; k++) { sum += out[k]; }
+        sm.add(sum / (hi - lo + 1));
+      }
+      out = sm;
+    }
+    return (out, step);
+  }
   double? _f;                // cursor inside the visible part (0..1)
   double _zoom = 1, _lo = 0; // _lo = start of the visible part (0..1 of all data)
   final Map<int, Offset> _ptr = {};
@@ -279,7 +305,7 @@ class _ScrubChartState extends State<ScrubChart> {
   @override
   void didUpdateWidget(ScrubChart o) {
     super.didUpdateWidget(o);
-    if (o.values.length != widget.values.length) { _zoom = 1; _lo = 0; _f = null; }
+    if (o.values.length != widget.values.length) { _zoom = 1; _lo = 0; _f = null; _anim.forward(from: 0); }
   }
 
   @override
@@ -322,9 +348,13 @@ class _ScrubChartState extends State<ScrubChart> {
             onHorizontalDragUpdate: (d) => _scrub(frac(d.localPosition)),
             onHorizontalDragEnd: (_) => _scrub(null),
             onHorizontalDragCancel: () => _scrub(null),
-            child: SizedBox(height: widget.height, width: double.infinity, child: CustomPaint(
-                painter: _ScrubPainter(vis, a, widget.color, s.outlineVariant, s.onSurfaceVariant, s.surfaceContainerHighest,
-                    s.onSurface, _f, widget.unit, widget.decimals, widget.labelOf))),
+            child: Builder(builder: (_) {
+              final (ds, step) = _down(vis, (box.maxWidth / 3).round());
+              return SizedBox(height: widget.height, width: double.infinity, child: AnimatedBuilder(animation: _anim,
+                builder: (_, _) => CustomPaint(
+                  painter: _ScrubPainter(ds, a, step, Curves.easeOutCubic.transform(_anim.value), widget.color, s.tertiary,
+                      s.outlineVariant, s.onSurfaceVariant, s.surface, s.onSurface, _f, widget.unit, widget.decimals, widget.labelOf))));
+            }),
           ),
         );
       }),
@@ -347,54 +377,66 @@ class _ScrubChartState extends State<ScrubChart> {
 const double _kPad = 34;
 
 class _ScrubPainter extends CustomPainter {
-  final List<double> v; final int start; final Color color, grid, text, bubble, bubbleText;
+  final List<double> v; final int start; final double step, progress;
+  final Color color, accent, grid, text, surface, onSurface;
   final double? f; final String unit; final int decimals; final String Function(int)? labelOf;
-  _ScrubPainter(this.v, this.start, this.color, this.grid, this.text, this.bubble, this.bubbleText, this.f, this.unit, this.decimals, this.labelOf);
+  _ScrubPainter(this.v, this.start, this.step, this.progress, this.color, this.accent, this.grid, this.text,
+      this.surface, this.onSurface, this.f, this.unit, this.decimals, this.labelOf);
 
   @override
   void paint(Canvas c, Size size) {
-    if (v.length < 2) return;
-    var lo = v.reduce((a, b) => a < b ? a : b), hi = v.reduce((a, b) => a > b ? a : b);
+    final n = v.length;
+    if (n < 2) return;
+    var lo = v.reduce(math.min), hi = v.reduce(math.max);
     if (hi - lo < 1) { hi = lo + 1; }
-    const top = 26.0, bottom = 6.0;
-    final w = size.width - _kPad, h = size.height - top - bottom;
-    double xAt(int i) => _kPad + w * i / (v.length - 1);
+    final pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
+    const top = 28.0, bottom = 6.0;
+    final w = size.width - _kPad - 8, h = size.height - top - bottom;
+    double xAt(int i) => _kPad + w * i / (n - 1);
     double yAt(double val) => top + h * (1 - (val - lo) / (hi - lo));
     for (var k = 0; k < 3; k++) {
       final val = hi - (hi - lo) * k / 2, y = yAt(val);
-      c.drawLine(Offset(_kPad, y), Offset(size.width, y), Paint()..color = grid.withValues(alpha: 0.5)..strokeWidth = 1);
-      final tp = TextPainter(text: TextSpan(text: val.round().toString(), style: TextStyle(color: text, fontSize: 10)),
+      c.drawLine(Offset(_kPad, y), Offset(size.width, y), Paint()..color = grid.withValues(alpha: 0.45)..strokeWidth = 1);
+      final tp = TextPainter(text: TextSpan(text: val.round().toString(), style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.w600)),
           textDirection: TextDirection.ltr)..layout();
-      tp.paint(c, Offset(0, y - tp.height / 2));
+      tp.paint(c, Offset(_kPad - 6 - tp.width, y - tp.height / 2));
     }
-    final path = Path();
-    for (var i = 0; i < v.length; i++) {
-      i == 0 ? path.moveTo(xAt(i), yAt(v[i])) : path.lineTo(xAt(i), yAt(v[i]));
+    final pts = [for (var i = 0; i < n; i++) Offset(xAt(i), yAt(v[i]))];
+    final path = Path()..moveTo(pts[0].dx, pts[0].dy);
+    for (var i = 0; i < n - 1; i++) {
+      final p0 = pts[math.max(i - 1, 0)], p1 = pts[i], p2 = pts[i + 1], p3 = pts[math.min(i + 2, n - 1)];
+      final c1 = p1 + (p2 - p0) / 6, c2 = p2 - (p3 - p1) / 6;
+      path.cubicTo(c1.dx, c1.dy.clamp(top, top + h).toDouble(), c2.dx, c2.dy.clamp(top, top + h).toDouble(), p2.dx, p2.dy);
     }
-    final fill = Path.from(path)..lineTo(size.width, size.height - bottom)..lineTo(_kPad, size.height - bottom)..close();
+    c.save();
+    c.clipRect(Rect.fromLTRB(_kPad - 6, 0, math.min(size.width, _kPad + w * progress + 6), size.height));
+    final fill = Path.from(path)..lineTo(pts.last.dx, top + h)..lineTo(pts.first.dx, top + h)..close();
     c.drawPath(fill, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
-        colors: [color.withValues(alpha: 0.35), color.withValues(alpha: 0)]).createShader(Offset.zero & size));
-    c.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2.5..strokeJoin = StrokeJoin.round);
-    if (f != null) {
-      final i = (f! * (v.length - 1)).round();
-      final x = xAt(i), y = yAt(v[i]);
-      c.drawLine(Offset(x, top - 4), Offset(x, size.height - bottom), Paint()..color = color.withValues(alpha: 0.6)..strokeWidth = 1.5);
-      c.drawCircle(Offset(x, y), 6, Paint()..color = color);
-      c.drawCircle(Offset(x, y), 6, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2);
-      final label = labelOf?.call(start + i);
+        colors: [color.withValues(alpha: 0.38), accent.withValues(alpha: 0.02)]).createShader(Rect.fromLTWH(_kPad, top, w, h)));
+    c.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 3.5..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round
+      ..shader = LinearGradient(colors: [color, accent]).createShader(Rect.fromLTWH(_kPad, top, w, h)));
+    c.restore();
+    final fi = f;
+    if (fi != null) {
+      final i = (fi * (n - 1)).round().clamp(0, n - 1);
+      final p = pts[i];
+      c.drawLine(Offset(p.dx, top), Offset(p.dx, top + h), Paint()..color = accent.withValues(alpha: 0.4)..strokeWidth = 1.5);
+      c.drawCircle(p, 8, Paint()..color = surface);
+      c.drawCircle(p, 5.5, Paint()..color = accent);
+      final label = labelOf?.call(start + (i * step).round());
       final tp = TextPainter(
           text: TextSpan(text: '${v[i].toStringAsFixed(decimals)} $unit${label == null ? '' : '  ·  $label'}',
-              style: TextStyle(color: bubbleText, fontSize: 12, fontWeight: FontWeight.w700)),
+              style: TextStyle(color: surface, fontSize: 11, fontWeight: FontWeight.w800)),
           textDirection: TextDirection.ltr)..layout();
-      final bw = tp.width + 16, bh = tp.height + 8;
-      final bx = (x - bw / 2).clamp(0.0, size.width - bw).toDouble();
-      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(bx, 0, bw, bh), const Radius.circular(10)), Paint()..color = bubble);
-      tp.paint(c, Offset(bx + 8, 4));
+      final bw = tp.width + 18, bh = tp.height + 10;
+      final bx = (p.dx - bw / 2).clamp(0.0, size.width - bw).toDouble();
+      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(bx, 0, bw, bh), const Radius.circular(12)), Paint()..color = onSurface);
+      tp.paint(c, Offset(bx + 9, 5));
     }
   }
 
   @override
-  bool shouldRepaint(_ScrubPainter o) => o.f != f || o.v != v || o.color != color || o.start != start;
+  bool shouldRepaint(_ScrubPainter o) => o.f != f || o.v != v || o.color != color || o.start != start || o.progress != progress;
 }
 
 

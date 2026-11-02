@@ -7,15 +7,23 @@ import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
 
-/// Map tiles: OpenStreetMap (no API key). In dark mode the tiles are inverted.
+/// Map tiles: CARTO light / dark basemaps (OpenStreetMap data, no API key).
 Widget hsTileLayer(BuildContext c) {
   final dark = Theme.of(c).brightness == Brightness.dark;
   return TileLayer(
-    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    urlTemplate: 'https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png',
+    subdomains: const ['a', 'b', 'c', 'd'],
+    retinaMode: RetinaMode.isHighDensity(c),
+    maxNativeZoom: 20,
     userAgentPackageName: 'com.healthstats.app',
-    tileBuilder: dark ? darkModeTileBuilder : null,
   );
 }
+
+/// Small credit, without the flutter_map logo text.
+Widget hsAttribution() => const RichAttributionWidget(
+  showFlutterMapAttribution: false,
+  attributions: [TextSourceAttribution('© OpenStreetMap, © CARTO')],
+);
 
 class WorkoutDetailPage extends StatefulWidget {
   final Workout workout;
@@ -157,7 +165,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
                     Marker(point: pts.last, width: 18, height: 18, child: const _Dot(Colors.red)),
                     if (_cur != null) Marker(point: _cur!, width: 26, height: 26, child: _Dot(col)),
                   ]),
-                  const SimpleAttributionWidget(source: Text('OpenStreetMap')),
+                  hsAttribution(),
                 ],
               )))) : const SizedBox(width: double.infinity)),
         // No GPS = nothing shown. Only a small button when Health Connect may hold a route we are not allowed to read yet.

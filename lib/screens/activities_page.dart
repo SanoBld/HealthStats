@@ -18,6 +18,8 @@ class ActivitiesPage extends StatefulWidget {
 class _ActivitiesPageState extends State<ActivitiesPage> {
   int? _type; // null = all sports
   String? _src; // null = all apps
+  String _q = '';
+  static String _n(String x) => x.toLowerCase();
 
   String _month(DateTime d) {
     const fr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
@@ -32,7 +34,8 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
       listenable: Listenable.merge([hs, sportColorsNotifier, localeNotifier]),
       builder: (ctx, _) {
         final srcs = {for (final w in hs.workouts) w.sourceName};
-        final list = hs.workouts.where((w) => (_type == null || w.type == _type) && (_src == null || w.sourceName == _src)).toList();
+        final list = hs.workouts.where((w) => (_type == null || w.type == _type) && (_src == null || w.sourceName == _src) &&
+            (_q.isEmpty || _n('${w.title} ${sportName(w.sport)} ${w.sourceName} ${w.notes}').contains(_q))).toList();
         // Items = month headers (String) + workouts
         final items = <Object>[];
         String? cur;
@@ -46,7 +49,9 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
               subtitle: _type == null && _src == null ? '${list.length}' : '${list.length} / ${hs.workouts.length}',
               actions: [IconButton(tooltip: isFr ? 'Importer GPX / FIT' : 'Import GPX / FIT', icon: const Icon(Icons.file_upload_outlined),
                   onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const ImportPage())))]),
-          SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+          M3SearchField(hint: isFr ? 'Rechercher une activité' : 'Search activities', padding: const EdgeInsets.fromLTRB(16, 0, 16, 6),
+              onChanged: (v) => setState(() => _q = _n(v.trim()))),
+          ClipRect(child: SizedBox(height: 52, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.fromLTRB(12, 4, 12, 8), children: [
             FilterChipButton(
               label: _type == null ? (isFr ? 'Tous les sports' : 'All sports') : sportName(sportOf(_type!)),
               active: _type != null,
@@ -72,7 +77,7 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
                 if (r != null) setState(() => _src = r.isEmpty ? null : r);
               },
             ),
-          ])),
+          ]))),
           Expanded(child: list.isEmpty
               ? (hs.loading
                   ? Center(child: SyncLoader(text: hs.stage.isEmpty ? (isFr ? 'Chargement…' : 'Loading…') : hs.stage, progress: hs.progress))
@@ -81,7 +86,7 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
                   padding: const EdgeInsets.only(bottom: 24), itemCount: items.length,
                   itemBuilder: (_, i) {
                     final it = items[i];
-                    if (it is String) return SectionTitle(it);
+                    if (it is String) return SectionTitle(it, compact: true);
                     final w = it as Workout;
                     return WorkoutCard(w: w, onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => WorkoutDetailPage(workout: w))));
                   }))),

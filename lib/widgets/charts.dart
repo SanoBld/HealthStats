@@ -25,7 +25,8 @@ String _monthShort(String key) {
 
 class TrendChart extends StatefulWidget {
   final Map<String, int> monthly;
-  const TrendChart({super.key, required this.monthly});
+  final bool showStats;
+  const TrendChart({super.key, required this.monthly, this.showStats = true});
   @override
   State<TrendChart> createState() => TrendChartState();
 }
@@ -33,7 +34,6 @@ class TrendChart extends StatefulWidget {
 class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMixin {
   late final AnimationController _anim =
       AnimationController(vsync: this, duration: const Duration(milliseconds: 900))..forward();
-  bool _cumul = false;
   int? _sel;
 
   // Zoom: _zoom >= 1, _lo = first visible index (in index units)
@@ -43,9 +43,10 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
   @override
   void dispose() { _anim.dispose(); super.dispose(); }
 
-  void _setMode(bool c) {
-    setState(() { _cumul = c; _sel = null; });
-    _anim.forward(from: 0);
+  @override
+  void didUpdateWidget(TrendChart o) {
+    super.didUpdateWidget(o);
+    if (o.monthly != widget.monthly) { _sel = null; _zoom = 1; _lo = 0; _anim.forward(from: 0); }
   }
 
   double _maxZoom(int n) => n <= 3 ? 1 : math.min(16.0, (n - 1) / 2);
@@ -72,8 +73,7 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
     final t = Theme.of(context).textTheme;
     final keys = widget.monthly.keys.toList()..sort();
     final raw  = [for (final k in keys) widget.monthly[k]!.toDouble()];
-    var acc = 0.0;
-    final vals = _cumul ? [for (final v in raw) acc += v] : raw;
+    final vals = raw;
     final total = raw.fold<double>(0, (a, b) => a + b).round();
     final avg   = raw.isEmpty ? 0 : (total / raw.length).round();
     var bestI = 0;
@@ -85,7 +85,7 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
       decoration: _chartCardDecoration(s, s.primaryContainer),
       padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Wrap(spacing: 8, runSpacing: 8, children: [
+        if (widget.showStats) Wrap(spacing: 8, runSpacing: 8, children: [
           _ChipStat(label: tx('ui_total'), value: _fmt(total), s: s, t: t,
               bg: s.primaryContainer, fg: s.onPrimaryContainer),
           _ChipStat(label: tx('ui_avg_mo'), value: _fmt(avg), s: s, t: t,
@@ -94,20 +94,10 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
             _ChipStat(label: tx('cx_best_month'), value: labels[bestI], s: s, t: t,
                 bg: s.tertiaryContainer, fg: s.onTertiaryContainer),
         ]),
-        const SizedBox(height: 14),
+        if (widget.showStats) const SizedBox(height: 14),
         Row(children: [
-          Expanded(
-            child: M3SegmentedButton<bool>(
-              segments: [
-                ButtonSegment(value: false, label: Text(tx('cx_by_month'))),
-                ButtonSegment(value: true,  label: Text(tx('cx_cumulative'))),
-              ],
-              selected: {_cumul},
-              onSelectionChanged: (v) => _setMode(v.first),
-            ),
-          ),
+          const Spacer(),
           if (raw.length > 3) ...[
-            const SizedBox(width: 8),
             IconButton.filledTonal(
               icon: const Icon(Icons.zoom_out_rounded),
               onPressed: _zoom > 1 ? () => _zoomTo(raw.length, _zoom / 1.6, 0.5) : null,
@@ -119,7 +109,7 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
             ),
           ],
         ]),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         SizedBox(
           height: 230,
           child: LayoutBuilder(builder: (ctx, c) {
