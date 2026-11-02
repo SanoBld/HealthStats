@@ -78,8 +78,13 @@ const Map<int, SportInfo> kSports = {
 SportInfo sportOf(int t) => kSports[t] ?? kSports[0]!;
 
 /// Friendly name of the app that wrote a session (from its package name).
+/// Real app names read from Android (filled after the sync).
+final Map<String, String> kAppLabels = {};
+
 String sourceLabel(String pkg) {
   if (pkg.isEmpty) return '—';
+  final real = kAppLabels[pkg];
+  if (real != null && real.isNotEmpty) return real;
   const known = {
     'com.google.android.apps.fitness': 'Google Fit',
     'com.google.android.apps.healthdata': 'Health Connect',

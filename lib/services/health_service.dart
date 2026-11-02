@@ -31,6 +31,9 @@ class HealthService extends ChangeNotifier {
   bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
   bool get hasHistoryPerm => grantedPerms.any((p) => p.endsWith('READ_HEALTH_DATA_HISTORY'));
 
+  // App icons (PNG) by package name
+  final Map<String, Uint8List> appIcons = {};
+
   // Small GPS tracks for the map tab (saved on disk)
   final Map<String, List<LatLng>> tracks = {};
   final Set<String> _noTrack = {};
@@ -39,6 +42,7 @@ class HealthService extends ChangeNotifier {
 
   Future<void> init() async {
     await _loadCache();
+    loadAppInfo();
     await refreshStatus();
     if (permitted) sync();
   }
@@ -117,6 +121,7 @@ class HealthService extends ChangeNotifier {
       lastSync = DateTime.now();
       await _saveCache();
       _fillHeight();
+      loadAppInfo();
     } on PlatformException catch (e) { error = e.message ?? e.code; }
     on TimeoutException { error = _fr ? 'Health Connect ne répond pas. Réessayez.' : 'Health Connect is not answering. Try again.'; }
     catch (e) { error = '$e'; }
@@ -124,6 +129,23 @@ class HealthService extends ChangeNotifier {
       loading = false; progress = null; stage = '';
       notifyListeners();
     }
+  }
+
+  /// Reads name + icon of the source apps (only the ones not loaded yet).
+  Future<void> loadAppInfo() async {
+    final pkgs = {for (final w in workouts) if (w.source.isNotEmpty) w.source}.where((p) => !appIcons.containsKey(p) && !kAppLabels.containsKey(p)).toList();
+    if (pkgs.isEmpty) return;
+    try {
+      final r = (await _ch.invokeMethod<List>('appInfo', {'pkgs': pkgs}).timeout(const Duration(seconds: 20))) ?? [];
+      for (final e in r) {
+        final m = e as Map;
+        final pkg = m['pkg'] as String;
+        if (m['label'] != null) kAppLabels[pkg] = m['label'] as String;
+        if (m['icon'] != null) appIcons[pkg] = m['icon'] as Uint8List;
+        if (m['label'] == null) kAppLabels[pkg] = '';
+      }
+      notifyListeners();
+    } catch (_) {}
   }
 
   bool get _fr => localeNotifier.value == 'fr';
@@ -241,6 +263,24 @@ class HealthService extends ChangeNotifier {
       try { final f = await _f(name); if (await f.exists()) n += await f.length(); } catch (_) {}
     }
     return n;
+  }
+
+  /// Sizes in bytes of the two cache files.
+  Future<(int, int)> cacheSizes() async {
+    Future<int> sz(String n) async { try { final f = await _f(n); return await f.exists() ? await f.length() : 0; } catch (_) { return 0; } }
+    return (await sz('hs_cache.json'), await sz('hs_tracks.json'));
+  }
+
+  Future<void> clearTracks() async {
+    tracks.clear(); _noTrack.clear();
+    try { await (await _f('hs_tracks.json')).delete(); } catch (_) {}
+    notifyListeners();
+  }
+
+  Future<void> clearActivities() async {
+    workouts = []; days = []; _routes.clear(); lastSync = null;
+    try { await (await _f('hs_cache.json')).delete(); } catch (_) {}
+    notifyListeners();
   }
 
   /// Only call this after the user confirmed (see confirmClearCache).

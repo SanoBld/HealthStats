@@ -25,6 +25,29 @@ Future<DateTime?> pickBirthDate(BuildContext c, DateTime? cur) => showM3DatePick
 Color sportColor(BuildContext c, SportInfo s) =>
     sportColorsNotifier.value ? s.color : Theme.of(c).colorScheme.primary;
 
+/// Icon of the app that wrote a session (falls back to a generic icon).
+class AppIcon extends StatelessWidget {
+  final String pkg; final double size;
+  const AppIcon(this.pkg, {super.key, this.size = 18});
+  @override
+  Widget build(BuildContext c) {
+    final b = HealthService.instance.appIcons[pkg];
+    if (b == null) return Icon(Icons.apps_rounded, size: size, color: Theme.of(c).colorScheme.onSurfaceVariant);
+    return ClipRRect(borderRadius: BorderRadius.circular(size * 0.25), child: Image.memory(b, width: size, height: size, gaplessPlayback: true));
+  }
+}
+
+/// Generic yes/no dialog. Returns true only if the user confirms.
+Future<bool> confirmDialog(BuildContext c, {required String title, required String message, required String ok, IconData? icon}) async {
+  final r = await showDialog<bool>(context: c, builder: (_) => AlertDialog(
+    icon: icon == null ? null : Icon(icon), title: Text(title), content: Text(message),
+    actions: [
+      TextButton(onPressed: () => Navigator.pop(c, false), child: Text(isFr ? 'Annuler' : 'Cancel')),
+      FilledButton(onPressed: () => Navigator.pop(c, true), child: Text(ok)),
+    ]));
+  return r == true;
+}
+
 /// Asks before deleting the local cache. Returns true if it was cleared.
 Future<bool> confirmClearCache(BuildContext c) async {
   final hs = HealthService.instance;
@@ -145,7 +168,7 @@ class WorkoutCard extends StatelessWidget {
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(w.title.isNotEmpty ? w.title : sportName(sp), style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
-                Text('${fmtDate(w.start)} · ${w.sourceName}', style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
+                Row(children: [AppIcon(w.source, size: 14), const SizedBox(width: 5), Expanded(child: Text('${fmtDate(w.start)} · ${w.sourceName}', maxLines: 1, overflow: TextOverflow.ellipsis, style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)))]),
                 const SizedBox(height: 4),
                 Text(parts.join(' · '), style: t.bodyMedium),
               ])),
@@ -319,8 +342,8 @@ class _ScrubPainter extends CustomPainter {
 
 // ── Filters with many choices: one chip that opens a searchable list ──
 class FilterEntry {
-  final String key, label; final IconData? icon; final int count;
-  const FilterEntry(this.key, this.label, this.count, [this.icon]);
+  final String key, label; final IconData? icon; final int count; final Widget? leading;
+  const FilterEntry(this.key, this.label, this.count, [this.icon, this.leading]);
 }
 
 /// Returns the chosen key, '' for "all", or null if closed.
@@ -357,21 +380,21 @@ class _FilterSheetState extends State<_FilterSheet> {
               filled: true, fillColor: s.surfaceContainerHigh, border: OutlineInputBorder(borderRadius: BorderRadius.circular(28), borderSide: BorderSide.none)),
         )),
         Expanded(child: ListView(padding: const EdgeInsets.fromLTRB(12, 0, 12, 24), children: [
-          if (_q.isEmpty) _tile(c, '', widget.allLabel, null, null),
-          for (final e in list) _tile(c, e.key, e.label, e.icon, e.count),
+          if (_q.isEmpty) _tile(c, '', widget.allLabel, null, null, null),
+          for (final e in list) _tile(c, e.key, e.label, e.icon, e.count, e.leading),
           if (list.isEmpty) Padding(padding: const EdgeInsets.all(24), child: Center(child: Text(isFr ? 'Aucun résultat' : 'No result'))),
         ])),
       ])),
     );
   }
 
-  Widget _tile(BuildContext c, String key, String label, IconData? icon, int? count) {
+  Widget _tile(BuildContext c, String key, String label, IconData? icon, int? count, Widget? leading) {
     final s = Theme.of(c).colorScheme;
     final sel = (widget.current ?? '') == key;
     return Padding(padding: const EdgeInsets.symmetric(vertical: 2), child: ListTile(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(sel ? 24 : 14)),
       tileColor: sel ? s.primaryContainer : null,
-      leading: icon == null ? null : Icon(icon),
+      leading: leading ?? (icon == null ? null : Icon(icon)),
       title: Text(label, style: TextStyle(fontWeight: sel ? FontWeight.w700 : FontWeight.w500)),
       trailing: count == null ? null : Text('$count', style: Theme.of(c).textTheme.labelLarge?.copyWith(color: s.onSurfaceVariant)),
       onTap: () => Navigator.pop(c, key),

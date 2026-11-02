@@ -74,7 +74,6 @@ class _ChartsPageState extends State<ChartsPage> {
   Widget build(BuildContext context) {
     final hs = HealthService.instance;
     return ListenableBuilder(listenable: Listenable.merge([hs, localeNotifierListenable]), builder: (ctx, _) {
-      final types = {for (final w in hs.workouts) w.type};
       final ws = hs.workouts.where((w) => _type == null || w.type == _type).toList();
       final series = _series(hs, ws);
       // By weekday (last 12 weeks)

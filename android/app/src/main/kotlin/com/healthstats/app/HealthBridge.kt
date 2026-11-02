@@ -9,6 +9,9 @@ import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
 import androidx.health.connect.client.request.AggregateRequest
 import androidx.health.connect.client.request.ReadRecordsRequest
 import androidx.health.connect.client.time.TimeRangeFilter
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import java.io.ByteArrayOutputStream
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.Period
@@ -46,6 +49,24 @@ class HealthBridge(private val ctx: Context) {
         HealthConnectClient.SDK_AVAILABLE -> "available"
         HealthConnectClient.SDK_UNAVAILABLE_PROVIDER_UPDATE_REQUIRED -> "update_required"
         else -> "unavailable"
+    }
+
+    /** Name + icon (PNG) of the apps that wrote the data. Only for installed apps. */
+    fun appInfo(pkgs: List<String>): List<Map<String, Any?>> {
+        val pm = ctx.packageManager
+        return pkgs.map { pkg ->
+            try {
+                val label = pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+                val d = pm.getApplicationIcon(pkg)
+                val size = 96
+                val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                d.setBounds(0, 0, size, size)
+                d.draw(Canvas(bmp))
+                val bos = ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.PNG, 100, bos)
+                mapOf("pkg" to pkg, "label" to label, "icon" to bos.toByteArray())
+            } catch (e: Exception) { mapOf("pkg" to pkg) }
+        }
     }
 
     private val client by lazy { HealthConnectClient.getOrCreate(ctx) }

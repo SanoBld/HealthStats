@@ -89,7 +89,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   List<double> _zones(int maxHr) {
     final z = List<double>.filled(5, 0);
     for (var i = 0; i < _hr.length - 1; i++) {
-      final dt = (_hr[i + 1].$1.difference(_hr[i].$1).inSeconds.clamp(0, 30) as int).toDouble();
+      final dt = _hr[i + 1].$1.difference(_hr[i].$1).inSeconds.clamp(0, 30).toDouble();
       final p = _hr[i].$2 / maxHr;
       z[p < 0.6 ? 0 : p < 0.7 ? 1 : p < 0.8 ? 2 : p < 0.9 ? 3 : 4] += dt;
     }

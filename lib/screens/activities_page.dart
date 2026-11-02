@@ -30,7 +30,6 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
     return ListenableBuilder(
       listenable: Listenable.merge([hs, sportColorsNotifier, localeNotifier]),
       builder: (ctx, _) {
-        final types = {for (final w in hs.workouts) w.type};
         final srcs = {for (final w in hs.workouts) w.sourceName};
         final list = hs.workouts.where((w) => (_type == null || w.type == _type) && (_src == null || w.sourceName == _src)).toList();
         // Items = month headers (String) + workouts
@@ -66,7 +65,7 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
                 for (final w in hs.workouts) { counts[w.sourceName] = (counts[w.sourceName] ?? 0) + 1; }
                 final sorted = counts.entries.toList()..sort((x, y) => y.value.compareTo(x.value));
                 final r = await pickFilter(ctx, title: isFr ? 'Application' : 'App', allLabel: isFr ? 'Toutes les applis' : 'All apps',
-                    entries: [for (final e in sorted) FilterEntry(e.key, e.key, e.value, Icons.apps_rounded)], current: _src);
+                    entries: [for (final e in sorted) FilterEntry(e.key, e.key, e.value, null, AppIcon(hs.workouts.firstWhere((w) => w.sourceName == e.key).source, size: 28))], current: _src);
                 if (r != null) setState(() => _src = r.isEmpty ? null : r);
               },
             ),

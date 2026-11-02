@@ -3,12 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../l10n/l10n.dart';
+import '../widgets/hs_widgets.dart' show isFr;
 import '../theme/m3_motion.dart';
 import 'activities_page.dart';
 import 'charts_page.dart';
 import 'dashboard_page.dart';
 import '../services/health_service.dart';
 import 'map_page.dart';
+import 'search_page.dart';
 import 'settings_page.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -36,7 +38,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final pages = [
       DashboardPage(onOpenTab: (i) => setState(() => _idx = i)),
-      const ActivitiesPage(), const MapPage(), const ChartsPage(), const SettingsPage(),
+      const ActivitiesPage(), const MapPage(), const SearchPage(), const ChartsPage(), const SettingsPage(),
     ];
     return Scaffold(
       body: M3FadeThroughStack(index: _idx, children: pages),
@@ -50,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard_rounded), label: L.navDashboard),
           NavigationDestination(icon: const Icon(Icons.fitness_center_outlined), selectedIcon: const Icon(Icons.fitness_center_rounded), label: L.navActivities),
           NavigationDestination(icon: const Icon(Icons.map_outlined), selectedIcon: const Icon(Icons.map_rounded), label: L.navMap),
+          NavigationDestination(icon: const Icon(Icons.search_rounded), selectedIcon: const Icon(Icons.search_rounded), label: isFr ? 'Recherche' : 'Search'),
           NavigationDestination(icon: const Icon(Icons.auto_graph_outlined), selectedIcon: const Icon(Icons.auto_graph_rounded), label: L.navCharts),
           NavigationDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings_rounded), label: L.navSettings),
         ],
