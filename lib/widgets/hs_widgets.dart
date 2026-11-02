@@ -592,3 +592,40 @@ class _InlineNumberTileState extends State<InlineNumberTile> {
     ));
   }
 }
+
+
+/// Inline banner asking for a missing Health Connect permission (no popup of ours).
+class PermPrompt extends StatefulWidget {
+  final String perm, text; final IconData icon; final VoidCallback? onGranted;
+  const PermPrompt({super.key, required this.perm, required this.text, this.icon = Icons.lock_open_rounded, this.onGranted});
+  @override
+  State<PermPrompt> createState() => _PermPromptState();
+}
+
+class _PermPromptState extends State<PermPrompt> {
+  bool _busy = false;
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme, hs = HealthService.instance;
+    return ListenableBuilder(listenable: hs, builder: (_, __) => AnimatedSize(
+      duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
+      child: hs.hasPerm(widget.perm) ? const SizedBox(width: double.infinity) : Container(
+        margin: const EdgeInsets.fromLTRB(16, 4, 16, 8), padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(color: s.tertiaryContainer, borderRadius: BorderRadius.circular(16)),
+        child: Row(children: [
+          Icon(widget.icon, color: s.tertiary), const SizedBox(width: 12),
+          Expanded(child: Text(widget.text, style: TextStyle(color: s.onTertiaryContainer))),
+          const SizedBox(width: 8),
+          FilledButton(
+            onPressed: _busy ? null : () async {
+              setState(() => _busy = true);
+              final ok = await hs.ensurePerm(widget.perm);
+              if (mounted) setState(() => _busy = false);
+              if (ok) widget.onGranted?.call();
+            },
+            child: Text(isFr ? 'Autoriser' : 'Allow')),
+        ]),
+      ),
+    ));
+  }
+}

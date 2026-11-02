@@ -133,6 +133,54 @@ class _ChartsPageState extends State<ChartsPage> {
   }
 }
 
+class _MetricSpec {
+  final String kind, perm, fr, en, unit; final int dec;
+  const _MetricSpec(this.kind, this.perm, this.fr, this.en, this.unit, [this.dec = 0]);
+}
+const _extra = [
+  _MetricSpec('restingHr', 'READ_RESTING_HEART_RATE', 'FC au repos', 'Resting heart rate', 'bpm'),
+  _MetricSpec('hrv', 'READ_HEART_RATE_VARIABILITY', 'Variabilité cardiaque (HRV)', 'Heart rate variability (HRV)', 'ms'),
+  _MetricSpec('spo2', 'READ_OXYGEN_SATURATION', 'Oxygène dans le sang (SpO₂)', 'Blood oxygen (SpO₂)', '%', 1),
+  _MetricSpec('vo2', 'READ_VO2_MAX', 'VO₂ max', 'VO₂ max', 'ml/kg/min', 1),
+  _MetricSpec('resp', 'READ_RESPIRATORY_RATE', 'Respiration', 'Respiratory rate', '/min', 1),
+  _MetricSpec('bodyFat', 'READ_BODY_FAT', 'Masse grasse', 'Body fat', '%', 1),
+  _MetricSpec('systolic', 'READ_BLOOD_PRESSURE', 'Tension (systolique)', 'Blood pressure (systolic)', 'mmHg'),
+  _MetricSpec('temp', 'READ_BODY_TEMPERATURE', 'Température', 'Body temperature', '°C', 1),
+];
+
+/// One optional chart: shown when there is data; if the permission is missing, asks for it right here.
+class _MetricChart extends StatefulWidget {
+  final _MetricSpec spec; final String Function(DateTime) label; final Color color;
+  const _MetricChart({required this.spec, required this.label, required this.color});
+  @override
+  State<_MetricChart> createState() => _MetricChartState();
+}
+
+class _MetricChartState extends State<_MetricChart> {
+  late Future<List<(DateTime, double)>> _f = HealthService.instance.metric(widget.spec.kind);
+  @override
+  Widget build(BuildContext c) {
+    final m = widget.spec, hs = HealthService.instance;
+    return ListenableBuilder(listenable: hs, builder: (_, __) {
+      if (!hs.hasPerm(m.perm)) {
+        // only offer it once the rest is connected
+        if (!hs.permitted) return const SizedBox.shrink();
+        return PermPrompt(perm: m.perm, icon: Icons.show_chart_rounded, onGranted: () => setState(() => _f = hs.metric(m.kind)),
+            text: isFr ? 'Autorise « ${m.fr} » pour afficher ce graphe.' : 'Allow “${m.en}” to show this chart.');
+      }
+      return FutureBuilder<List<(DateTime, double)>>(future: _f, builder: (_, snap) {
+        final d = snap.data ?? const <(DateTime, double)>[];
+        if (d.length < 2) return const SizedBox.shrink();
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SectionTitle(isFr ? m.fr : m.en),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
+              values: d.map((e) => e.$2).toList(), color: widget.color, unit: m.unit, decimals: m.dec, labelOf: (i) => widget.label(d[i].$1))),
+        ]);
+      });
+    });
+  }
+}
+
 extension _Trends on _ChartsPageState {
   /// Touchable daily curves: heart rate, steps, weight (drag a finger to read each day).
   List<Widget> _trends(HealthService hs) {
@@ -153,6 +201,7 @@ extension _Trends on _ChartsPageState {
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
             values: st.map((d) => d.steps.toDouble()).toList(), color: p, unit: isFr ? 'pas' : 'steps', labelOf: (i) => lab(st[i].day))),
       ],
+      for (final m in _extra) _MetricChart(spec: m, label: lab, color: p),
       FutureBuilder<List<(DateTime, double)>>(future: _sleep, builder: (_, snap) {
         final sl = (snap.data ?? const <(DateTime, double)>[]).where((e) => e.$2 > 0.5).toList();
         if (sl.length < 2) return const SizedBox.shrink();

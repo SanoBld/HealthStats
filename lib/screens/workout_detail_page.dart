@@ -38,7 +38,12 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   @override
   void initState() {
     super.initState();
+    _load();
+  }
+
+  void _load() {
     final hs = HealthService.instance, w = widget.workout;
+    setState(() => _loading = true);
     final wantRoute = w.hasRoute || w.sport.outdoor;
     Future.wait([
       wantRoute ? hs.route(w, ask: true) : Future.value(<RoutePoint>[]),
@@ -133,6 +138,8 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
     return Scaffold(
       appBar: AppBar(title: Text(w.title.isNotEmpty ? w.title : sportName(sp))),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+        if (pts.length < 2 && (w.hasRoute || sp.outdoor)) PermPrompt(perm: 'READ_EXERCISE_ROUTE', icon: Icons.map_rounded, onGranted: _load,
+            text: isFr ? 'Autorise l’accès aux tracés GPS pour voir la carte.' : 'Allow access to GPS routes to see the map.'),
         if (pts.length > 1) SizedBox(height: 280, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
           child: ClipRRect(borderRadius: BorderRadius.circular(16),
             child: FlutterMap(
@@ -205,6 +212,8 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
               labelOf: recSpeed ? (i) => _clock(_spd[i].$1.difference(w.start)) : null,
               onScrub: recSpeed ? (f) => _timeCursor(_spd, f) : _routeCursor)),
         ],
+        if (_pow.length <= 5 && (w.type == 8 || w.type == 9)) PermPrompt(perm: 'READ_POWER', icon: Icons.bolt_rounded, onGranted: _load,
+            text: isFr ? 'Autorise la puissance pour afficher ce graphe.' : 'Allow power data to show this chart.'),
         if (_pow.length > 5) ...[
           SectionTitle(isFr ? 'Puissance' : 'Power'),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(

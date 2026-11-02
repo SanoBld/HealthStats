@@ -30,6 +30,17 @@ class HealthService extends ChangeNotifier {
   final Set<String> _statsOk = {}; // sessions whose stats are already saved
   Set<String> grantedPerms = {};
   bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
+  /// Is a Health Connect permission granted? [name] = end of the permission, e.g. 'READ_POWER'.
+  bool hasPerm(String name) => grantedPerms.any((p) => p.endsWith(name));
+  /// Asks for everything again; if Android no longer shows its dialog (denied twice),
+  /// opens Health Connect so the user can allow it there. Returns true when [name] is now granted.
+  Future<bool> ensurePerm(String name) async {
+    if (hasPerm(name)) return true;
+    await requestPermissions();
+    if (!hasPerm(name)) { await openHealthConnect(); }
+    return hasPerm(name);
+  }
+  String? routeError;
   bool get hasHistoryPerm => grantedPerms.any((p) => p.endsWith('READ_HEALTH_DATA_HISTORY'));
 
   // App icons (PNG) by package name
@@ -188,7 +199,7 @@ class HealthService extends ChangeNotifier {
       }).toList();
       if (pts.isNotEmpty && maxPoints == 0) _routes[w.id] = pts;
       return pts;
-    } catch (_) { return []; }
+    } catch (e) { routeError = '$e'; return []; }
   }
 
   /// Loads small tracks for the map (6 at a time, small routes), saves them on disk.
@@ -234,6 +245,21 @@ class HealthService extends ChangeNotifier {
               'start': w.start.millisecondsSinceEpoch, 'end': w.end.millisecondsSinceEpoch}).timeout(const Duration(seconds: 40))) ?? [];
       return r.map((e) { final l = (e as List).cast<num>();
         return (DateTime.fromMillisecondsSinceEpoch(l[0].toInt()), l[1].toDouble()); }).toList();
+    } catch (_) { return []; }
+  }
+
+  /// Values of a metric over [days]: restingHr, hrv, spo2, vo2, resp, bodyFat, systolic, temp.
+  Future<List<(DateTime, double)>> metric(String kind, {int days = 180}) async {
+    try {
+      final r = (await _ch.invokeMethod<List>('metric', {'kind': kind,
+              'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
+              'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 40))) ?? [];
+      final per = <DateTime, List<double>>{};
+      for (final e in r) { final l = (e as List).cast<num>();
+        final t = DateTime.fromMillisecondsSinceEpoch(l[0].toInt());
+        (per[DateTime(t.year, t.month, t.day)] ??= []).add(l[1].toDouble()); }
+      return per.entries.map((e) => (e.key, e.value.reduce((a, b) => a + b) / e.value.length)).toList()
+        ..sort((a, b) => a.$1.compareTo(b.$1));
     } catch (_) { return []; }
   }
 

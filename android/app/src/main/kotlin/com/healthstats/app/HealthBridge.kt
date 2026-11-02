@@ -41,6 +41,24 @@ class HealthBridge(private val ctx: Context) {
             HealthPermission.getReadPermission(HeightRecord::class),
             HealthPermission.getReadPermission(SpeedRecord::class),
             HealthPermission.getReadPermission(PowerRecord::class),
+            HealthPermission.getReadPermission(ElevationGainedRecord::class),
+            HealthPermission.getReadPermission(FloorsClimbedRecord::class),
+            HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+            HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+            HealthPermission.getReadPermission(OxygenSaturationRecord::class),
+            HealthPermission.getReadPermission(Vo2MaxRecord::class),
+            HealthPermission.getReadPermission(RespiratoryRateRecord::class),
+            HealthPermission.getReadPermission(BodyFatRecord::class),
+            HealthPermission.getReadPermission(LeanBodyMassRecord::class),
+            HealthPermission.getReadPermission(BoneMassRecord::class),
+            HealthPermission.getReadPermission(BodyWaterMassRecord::class),
+            HealthPermission.getReadPermission(BasalMetabolicRateRecord::class),
+            HealthPermission.getReadPermission(BodyTemperatureRecord::class),
+            HealthPermission.getReadPermission(BloodPressureRecord::class),
+            HealthPermission.getReadPermission(BloodGlucoseRecord::class),
+            HealthPermission.getReadPermission(HydrationRecord::class),
+            HealthPermission.getReadPermission(NutritionRecord::class),
+            HealthPermission.getReadPermission(WheelchairPushesRecord::class),
             ROUTE_PERM,
             HISTORY_PERM,
         )
@@ -284,6 +302,33 @@ class HealthBridge(private val ctx: Context) {
                 }
             } while (!token.isNullOrEmpty())
         } catch (e: Exception) { /* permission missing or no data */ }
+        return out.sortedBy { it[0] }
+    }
+
+    /** Daily-ish values of any metric: [timeMs, value]. */
+    suspend fun metric(kind: String, startMs: Long, endMs: Long): List<List<Double>> {
+        val out = ArrayList<List<Double>>()
+        val from = clampStart(startMs)
+        suspend fun <T : Record> pull(c: kotlin.reflect.KClass<T>, f: (T) -> List<Double>?) {
+            var token: String? = null
+            do {
+                val r = client.readRecords(ReadRecordsRequest(c, range(from, endMs), pageSize = 1000, pageToken = token))
+                r.records.forEach { rec -> f(rec)?.let { out.add(it) } }
+                token = r.pageToken
+            } while (!token.isNullOrEmpty())
+        }
+        try {
+            when (kind) {
+                "restingHr" -> pull(RestingHeartRateRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.beatsPerMinute.toDouble()) }
+                "hrv" -> pull(HeartRateVariabilityRmssdRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.heartRateVariabilityMillis) }
+                "spo2" -> pull(OxygenSaturationRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.percentage.value) }
+                "vo2" -> pull(Vo2MaxRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.vo2MillilitersPerMinuteKilogram) }
+                "resp" -> pull(RespiratoryRateRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.rate) }
+                "bodyFat" -> pull(BodyFatRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.percentage.value) }
+                "systolic" -> pull(BloodPressureRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.systolic.inMillimetersOfMercury) }
+                "temp" -> pull(BodyTemperatureRecord::class) { listOf(it.time.toEpochMilli().toDouble(), it.temperature.inCelsius) }
+            }
+        } catch (e: Exception) { /* permission missing */ }
         return out.sortedBy { it[0] }
     }
 
