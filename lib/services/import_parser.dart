@@ -353,3 +353,9 @@ Map<String, dynamic>? _parseFit(Uint8List b) {
   if (gps.isEmpty && all.length < 2 && sStart == null) return null;
   return _finish(pts: all, type: type, title: name ?? '', distanceM: sDist, kcal: sCal, sessionStartMs: sStart, sessionEndMs: sEnd);
 }
+
+// ── Public helpers for other sources (Intervals.icu…) ──
+Map<String, dynamic>? buildActivity({required List<List<double>> pts, required int? type, required String title,
+        double? distanceM, double? kcal, required double startMs, required double endMs}) =>
+    _finish(pts: pts, type: type, title: title, distanceM: distanceM, kcal: kcal, sessionStartMs: startMs, sessionEndMs: endMs);
+int? sportFromName(String s) => _sportFromName(s);

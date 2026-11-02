@@ -116,6 +116,21 @@ String sourceLabel(String pkg) {
     'com.google.android.wearable.healthservices': 'Wear OS',
     'com.healthstats.app': 'HealthStats',
     'import': 'Import GPX/FIT',
+    'intervals': 'Intervals.icu',
+    // watches / wearable apps that write to Health Connect
+    'com.stt.android.suunto': 'Suunto',
+    'com.stt.android': 'Suunto',
+    'com.hihonor.health': 'Honor Health',
+    'com.google.android.apps.wear.companion': 'Pixel Watch',
+    'com.samsung.android.wear.shealth': 'Galaxy Watch',
+    'com.amazfit.zepp': 'Zepp',
+    'com.coros.coros.app': 'COROS',
+    'com.nothing.cmf.watch': 'CMF Watch',
+    'com.polar.polarflow.beat': 'Polar Beat',
+    'com.garmin.connect.mobile': 'Garmin Connect',
+    'com.wahoofitness.elemnt': 'Wahoo',
+    'com.ticwatch.health': 'Mobvoi',
+    'com.mobvoi.companion.at': 'Mobvoi',
   };
   final k = known[pkg];
   if (k != null) return k;

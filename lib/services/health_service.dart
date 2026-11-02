@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 import '../app_state.dart';
 import '../models/health_models.dart';
 import 'import_parser.dart';
+import 'intervals_service.dart';
 
 enum HcStatus { available, updateRequired, unavailable }
 
@@ -156,6 +157,7 @@ class HealthService extends ChangeNotifier {
       lastSync = DateTime.now();
       _applyImports();
       await _saveCache();
+      IntervalsService.credentials().then((c) { if (c != null) syncIntervals(days: 30); });
       _fillHeight();
       loadAppInfo();
       // small route previews for the activity list (newest first, in the background)
@@ -358,7 +360,7 @@ class HealthService extends ChangeNotifier {
         }
       } else {
         out.add(Workout.fromMap({
-          'id': id, 'type': a['type'], 'title': a['title'] ?? '', 'source': 'import',
+          'id': id, 'type': a['type'], 'title': a['title'] ?? '', 'source': a['source'] == 'intervals' ? 'intervals' : 'import',
           'notes': a['guessed'] == true ? (_fr ? 'Sport deviné d’après la vitesse' : 'Sport guessed from the speed') : '',
           'start': a['start'], 'end': a['end'], 'hasRoute': route.length > 1,
           'distanceM': dist, 'activeKcal': kcal, 'totalKcal': kcal, 'steps': 0,
@@ -378,20 +380,57 @@ class HealthService extends ChangeNotifier {
     importing = true; notifyListeners();
     try {
       final r = await parseImportFiles(paths);
-      final known = {for (final a in _imports) a['id'] as String};
-      var added = 0, already = 0;
-      final fresh = <String>{};
-      for (final a in r.acts) {
-        final id = 'imp_${a['start']}';
-        if (known.contains(id)) { already++; continue; }
-        a['id'] = id; _imports.add(a); known.add(id); fresh.add(id); added++;
-      }
-      final m = _applyImports();
-      await _saveImports();
-      await _saveCache();
+      final x = await _addActs(r.acts);
+      final added = x.$1, already = x.$3;
+      final m = x.$2;
       loadTracks(workouts.where((w) => w.hasRoute).take(60).toList());
-      return (added: added, matched: m.where(fresh.contains).length, already: already, failed: r.errors.length);
+      return (added: added, matched: m, already: already, failed: r.errors.length);
     } finally { importing = false; notifyListeners(); }
+  }
+
+  bool _knownStart(int ms) => _imports.any((a) => ((a['start'] as num).toInt() - ms).abs() < 120000);
+
+  /// Adds parsed activities (skipping ones whose start is within 2 min of an existing import).
+  /// Returns (added, matched with an existing session, already known).
+  Future<(int, int, int)> _addActs(List<Map<String, dynamic>> acts) async {
+    var added = 0, already = 0;
+    final fresh = <String>{};
+    for (final a in acts) {
+      if (_knownStart((a['start'] as num).toInt())) { already++; continue; }
+      final id = 'imp_${a['start']}';
+      a['id'] = id; _imports.add(a); fresh.add(id); added++;
+    }
+    final m = _applyImports();
+    await _saveImports();
+    await _saveCache();
+    return (added, m.where(fresh.contains).length, already);
+  }
+
+  // ── Intervals.icu ──
+  String intervalsStage = '';
+  double intervalsProgress = 0;
+  bool intervalsBusy = false;
+  String? intervalsError;
+  ({int added, int matched, int strava, int known, int total})? intervalsResult;
+
+  /// Reads activities, GPS routes and heart rate from Intervals.icu (free personal API key).
+  Future<bool> syncIntervals({int days = 365}) async {
+    final c = await IntervalsService.credentials();
+    if (c == null || intervalsBusy) return false;
+    intervalsBusy = true; intervalsError = null; intervalsResult = null; intervalsStage = _fr ? 'Connexion…' : 'Connecting…'; intervalsProgress = 0;
+    notifyListeners();
+    try {
+      final r = await IntervalsService.fetch(key: c.$1, athlete: c.$2, days: days, fr: _fr, isKnown: _knownStart,
+          onStage: (st, p) { intervalsStage = st; intervalsProgress = p; notifyListeners(); });
+      if (r.error != null) { intervalsError = r.error; return false; }
+      final x = await _addActs(r.acts);
+      intervalsResult = (added: x.$1, matched: x.$2, strava: r.stravaSkipped, known: r.known, total: r.total);
+      await IntervalsService.markSynced();
+      loadTracks(workouts.where((w) => w.hasRoute).take(60).toList());
+      return true;
+    } catch (e) {
+      intervalsError = '$e'; return false;
+    } finally { intervalsBusy = false; notifyListeners(); }
   }
 
   Future<void> clearImports() async {
