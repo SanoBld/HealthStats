@@ -27,6 +27,7 @@ class HealthService extends ChangeNotifier {
   String stage = '';
   double? progress;
   final Map<String, List<RoutePoint>> _routes = {};
+  final Set<String> _statsOk = {}; // sessions whose stats are already saved
   Set<String> grantedPerms = {};
   bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
   bool get hasHistoryPerm => grantedPerms.any((p) => p.endsWith('READ_HEALTH_DATA_HISTORY'));
@@ -98,13 +99,26 @@ class HealthService extends ChangeNotifier {
       progress = 0.4;
       notifyListeners();
 
-      // 2) full stats (parallel on the Kotlin side). Keep the list if this fails.
-      try {
-        final ws = await _list('sessions', a, const Duration(minutes: 3));
-        workouts = ws.map((e) => Workout.fromMap(Map.from(e as Map))).toList()
-          ..sort((x, y) => y.start.compareTo(x.start));
-      } catch (e) {
-        error = _fr ? 'Statistiques incomplètes : $e' : 'Incomplete stats: $e';
+      // 2) stats, newest first, 25 sessions at a time (short calls, the screen updates after each one)
+      final need = workouts.where((w) => !_statsOk.contains(w.id)).toList();
+      var fails = 0;
+      for (var i = 0; i < need.length && fails < 2; i += 25) {
+        final g = need.skip(i).take(25).toList();
+        try {
+          final ws = await _list('sessions', {
+            'start': g.last.start.millisecondsSinceEpoch - 1000,
+            'end': g.first.end.millisecondsSinceEpoch + 1000}, const Duration(seconds: 60));
+          final byId = {for (final w in workouts) w.id: w};
+          for (final e in ws) { final w = Workout.fromMap(Map.from(e as Map)); byId[w.id] = w; _statsOk.add(w.id); }
+          workouts = byId.values.toList()..sort((x, y) => y.start.compareTo(x.start));
+          fails = 0;
+        } catch (e) {
+          fails++;
+          error = _fr ? 'Statistiques incomplètes : $e' : 'Incomplete stats: $e';
+        }
+        progress = 0.4 + 0.4 * ((i + 25) / need.length).clamp(0.0, 1.0).toDouble();
+        stage = _fr ? 'Statistiques ${(i + 25).clamp(0, need.length)} / ${need.length}…' : 'Stats ${(i + 25).clamp(0, need.length)} / ${need.length}…';
+        notifyListeners();
       }
       stage = _fr ? 'Pas, calories, distance…' : 'Steps, calories, distance…';
       progress = 0.8;
@@ -122,6 +136,8 @@ class HealthService extends ChangeNotifier {
       await _saveCache();
       _fillHeight();
       loadAppInfo();
+      // small route previews for the activity list (newest first, in the background)
+      loadTracks([for (final w in workouts) if (w.hasRoute) w].take(60).toList());
     } on PlatformException catch (e) { error = e.message ?? e.code; }
     on TimeoutException { error = _fr ? 'Health Connect ne répond pas. Réessayez.' : 'Health Connect is not answering. Try again.'; }
     catch (e) { error = '$e'; }
@@ -182,8 +198,8 @@ class HealthService extends ChangeNotifier {
     if (todo.isEmpty) return;
     trackBusy = true; trackProgress = 0; notifyListeners();
     var done = 0;
-    for (var i = 0; i < todo.length; i += 6) {
-      final batch = todo.skip(i).take(6).toList();
+    for (var i = 0; i < todo.length; i += 8) {
+      final batch = todo.skip(i).take(8).toList();
       await Future.wait(batch.map((w) async {
         final r = await route(w, ask: ask, maxPoints: 150);
         if (r.length > 1) {
@@ -191,6 +207,7 @@ class HealthService extends ChangeNotifier {
         } else { _noTrack.add(w.id); }
       }));
       done += batch.length;
+      if (done % 24 == 0) { _saveTracks(); }
       trackProgress = done / todo.length;
       notifyListeners();
     }
@@ -226,7 +243,7 @@ class HealthService extends ChangeNotifier {
     try {
       await (await _f('hs_cache.json')).writeAsString(jsonEncode({
         'sync': lastSync?.millisecondsSinceEpoch,
-        'w': workouts.map((w) => w.toMap()).toList(), 'd': days.map((d) => d.toMap()).toList()}));
+        'si': _statsOk.toList(), 'w': workouts.map((w) => w.toMap()).toList(), 'd': days.map((d) => d.toMap()).toList()}));
     } catch (_) {}
   }
   Future<void> _saveTracks() async {
@@ -242,6 +259,8 @@ class HealthService extends ChangeNotifier {
         final j = jsonDecode(await f.readAsString()) as Map;
         workouts = (j['w'] as List).map((e) => Workout.fromMap(e as Map)).toList();
         days = (j['d'] as List).map((e) => DayStat.fromMap(e as Map)).toList();
+        _statsOk.addAll(j['si'] != null ? (j['si'] as List).cast<String>()
+            : [for (final w in workouts) if (w.distanceM > 0 || w.hrAvg > 0 || w.kcal > 0 || w.steps > 0) w.id]);
         if (j['sync'] != null) lastSync = DateTime.fromMillisecondsSinceEpoch(j['sync'] as int);
       }
     } catch (_) {}
@@ -278,14 +297,14 @@ class HealthService extends ChangeNotifier {
   }
 
   Future<void> clearActivities() async {
-    workouts = []; days = []; _routes.clear(); lastSync = null;
+    workouts = []; days = []; _routes.clear(); _statsOk.clear(); lastSync = null;
     try { await (await _f('hs_cache.json')).delete(); } catch (_) {}
     notifyListeners();
   }
 
   /// Only call this after the user confirmed (see confirmClearCache).
   Future<void> clearCache() async {
-    workouts = []; days = []; _routes.clear(); tracks.clear(); _noTrack.clear(); lastSync = null;
+    workouts = []; days = []; _routes.clear(); _statsOk.clear(); tracks.clear(); _noTrack.clear(); lastSync = null;
     for (final name in ['hs_cache.json', 'hs_tracks.json']) {
       try { await (await _f(name)).delete(); } catch (_) {}
     }

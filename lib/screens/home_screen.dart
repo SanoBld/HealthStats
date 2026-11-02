@@ -11,7 +11,6 @@ import 'dashboard_page.dart';
 import '../services/health_service.dart';
 import 'map_page.dart';
 import 'search_page.dart';
-import 'settings_page.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     final pages = [
       DashboardPage(onOpenTab: (i) => setState(() => _idx = i)),
-      const ActivitiesPage(), const MapPage(), const SearchPage(), const ChartsPage(), const SettingsPage(),
+      const ActivitiesPage(), const MapPage(), const SearchPage(), const ChartsPage(),
     ];
     return Scaffold(
       body: M3FadeThroughStack(index: _idx, children: pages),
@@ -54,7 +53,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           NavigationDestination(icon: const Icon(Icons.map_outlined), selectedIcon: const Icon(Icons.map_rounded), label: L.navMap),
           NavigationDestination(icon: const Icon(Icons.search_rounded), selectedIcon: const Icon(Icons.search_rounded), label: isFr ? 'Recherche' : 'Search'),
           NavigationDestination(icon: const Icon(Icons.auto_graph_outlined), selectedIcon: const Icon(Icons.auto_graph_rounded), label: L.navCharts),
-          NavigationDestination(icon: const Icon(Icons.settings_outlined), selectedIcon: const Icon(Icons.settings_rounded), label: L.navSettings),
         ],
       ),
     );

@@ -1,9 +1,10 @@
 // Small shared HealthStats components (LastStats card style).
 import 'package:flutter/material.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import '../models/health_models.dart';
 import '../app_state.dart';
 import '../services/health_service.dart';
-import 'm3_components.dart' show M3Chip, M3WavyProgress;
+import 'm3_components.dart' show M3Chip, M3CookieBadge, M3PressCard, M3WavyProgress;
 import 'm3_date_picker.dart';
 import 'skeleton.dart' show M3LoadingIndicator;
 
@@ -114,12 +115,11 @@ class StatTile extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: s.surfaceContainer, borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: s.outlineVariant)),
+    final tint = color ?? s.primary;
+    return M3PressCard(
+      color: s.surfaceContainer, padding: const EdgeInsets.all(14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 20, color: color ?? s.primary),
+        M3CookieBadge(color: tint.withValues(alpha: 0.18), size: 38, child: Icon(icon, size: 20, color: tint)),
         const SizedBox(height: 10),
         Text(value, style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w700), maxLines: 1, overflow: TextOverflow.ellipsis),
         Text(label, style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
@@ -155,16 +155,10 @@ class WorkoutCard extends StatelessWidget {
     ];
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Material(
-        color: s.surfaceContainer, borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16), onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.all(14),
+      child: M3PressCard(
+            color: s.surfaceContainer, onTap: onTap, padding: const EdgeInsets.all(14),
             child: Row(children: [
-              Container(width: 46, height: 46,
-                  decoration: BoxDecoration(color: col.withValues(alpha: 0.18), shape: BoxShape.circle),
-                  child: Icon(sp.icon, color: col)),
+              M3CookieBadge(color: col.withValues(alpha: 0.18), size: 48, child: Icon(sp.icon, color: col)),
               const SizedBox(width: 14),
               Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(w.title.isNotEmpty ? w.title : sportName(sp), style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700)),
@@ -172,11 +166,11 @@ class WorkoutCard extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(parts.join(' · '), style: t.bodyMedium),
               ])),
-              if (w.hasRoute) Icon(Icons.route_rounded, size: 18, color: s.onSurfaceVariant),
+              if (HealthService.instance.tracks[w.id] != null)
+                SizedBox(width: 64, height: 44, child: CustomPaint(painter: _ThumbPainter(HealthService.instance.tracks[w.id]!, col)))
+              else if (w.hasRoute) Icon(Icons.route_rounded, size: 18, color: s.onSurfaceVariant),
               Icon(Icons.chevron_right_rounded, color: s.onSurfaceVariant),
             ]),
-          ),
-        ),
       ),
     );
   }
@@ -409,4 +403,128 @@ class FilterChipButton extends StatelessWidget {
   @override
   Widget build(BuildContext c) => Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
       child: M3Chip(label: Text('$label  ▾'), selected: active, onSelected: (_) => onTap()));
+}
+
+
+/// Tiny drawing of a GPS route (for the activity list).
+class _ThumbPainter extends CustomPainter {
+  final List<LatLng> pts; final Color color;
+  _ThumbPainter(this.pts, this.color);
+  @override
+  void paint(Canvas c, Size size) {
+    if (pts.length < 2) return;
+    var minLa = pts.first.latitude, maxLa = minLa, minLo = pts.first.longitude, maxLo = minLo;
+    for (final p in pts) {
+      if (p.latitude < minLa) minLa = p.latitude;
+      if (p.latitude > maxLa) maxLa = p.latitude;
+      if (p.longitude < minLo) minLo = p.longitude;
+      if (p.longitude > maxLo) maxLo = p.longitude;
+    }
+    final dLa = (maxLa - minLa).abs() < 1e-9 ? 1e-9 : maxLa - minLa, dLo = (maxLo - minLo).abs() < 1e-9 ? 1e-9 : maxLo - minLo;
+    final k = ((size.width - 6) / dLo) < ((size.height - 6) / dLa) ? (size.width - 6) / dLo : (size.height - 6) / dLa;
+    final ox = (size.width - dLo * k) / 2, oy = (size.height - dLa * k) / 2;
+    final path = Path();
+    for (var i = 0; i < pts.length; i++) {
+      final x = ox + (pts[i].longitude - minLo) * k, y = size.height - oy - (pts[i].latitude - minLa) * k;
+      i == 0 ? path.moveTo(x, y) : path.lineTo(x, y);
+    }
+    c.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2.2..strokeJoin = StrokeJoin.round..strokeCap = StrokeCap.round);
+  }
+  @override
+  bool shouldRepaint(_ThumbPainter o) => o.pts != pts || o.color != color;
+}
+
+/// Action row that asks for confirmation INSIDE the row (animated), no popup.
+class InlineConfirm extends StatefulWidget {
+  final IconData icon; final String title, message, okLabel; final String? subtitle; final bool danger;
+  final Future<void> Function() onConfirm;
+  const InlineConfirm({super.key, required this.icon, required this.title, required this.message, required this.okLabel,
+      this.subtitle, this.danger = false, required this.onConfirm});
+  @override
+  State<InlineConfirm> createState() => _InlineConfirmState();
+}
+
+class _InlineConfirmState extends State<InlineConfirm> {
+  bool _open = false, _busy = false;
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme;
+    final col = widget.danger ? s.error : s.primary;
+    return Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), child: AnimatedContainer(
+      duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(color: _open ? col.withValues(alpha: 0.12) : s.surfaceContainer, borderRadius: BorderRadius.circular(_open ? 24 : 16)),
+      clipBehavior: Clip.antiAlias,
+      child: AnimatedSize(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic, alignment: Alignment.topCenter,
+        child: Column(children: [
+          ListTile(
+            leading: Icon(widget.icon, color: widget.danger ? s.error : null),
+            title: Text(widget.title, style: TextStyle(color: widget.danger ? s.error : null)),
+            subtitle: widget.subtitle == null ? null : Text(widget.subtitle!),
+            trailing: AnimatedRotation(turns: _open ? 0.5 : 0, duration: const Duration(milliseconds: 320), child: const Icon(Icons.expand_more_rounded)),
+            onTap: _busy ? null : () => setState(() => _open = !_open)),
+          if (_open) Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(widget.message, style: Theme.of(c).textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+              TextButton(onPressed: _busy ? null : () => setState(() => _open = false), child: Text(isFr ? 'Annuler' : 'Cancel')),
+              const SizedBox(width: 8),
+              FilledButton(
+                style: widget.danger ? FilledButton.styleFrom(backgroundColor: s.error, foregroundColor: s.onError) : null,
+                onPressed: _busy ? null : () async {
+                  setState(() => _busy = true);
+                  await widget.onConfirm();
+                  if (mounted) setState(() { _busy = false; _open = false; });
+                },
+                child: _busy ? const SizedBox(width: 18, height: 18, child: M3LoadingIndicator(size: 18)) : Text(widget.okLabel)),
+            ]),
+          ])),
+        ]),
+      ),
+    ));
+  }
+}
+
+/// Row that turns into a number field inside the row (animated), no popup.
+class InlineNumberTile extends StatefulWidget {
+  final IconData icon; final String title, unit; final double value; final void Function(double) onSave;
+  const InlineNumberTile({super.key, required this.icon, required this.title, required this.unit, required this.value, required this.onSave});
+  @override
+  State<InlineNumberTile> createState() => _InlineNumberTileState();
+}
+
+class _InlineNumberTileState extends State<InlineNumberTile> {
+  bool _open = false;
+  late final _ctrl = TextEditingController();
+  @override
+  void dispose() { _ctrl.dispose(); super.dispose(); }
+  String _txt(double v) => v == v.roundToDouble() ? '${v.round()}' : '$v';
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme;
+    return Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2), child: AnimatedContainer(
+      duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic,
+      decoration: BoxDecoration(color: _open ? s.primaryContainer.withValues(alpha: 0.5) : s.surfaceContainer, borderRadius: BorderRadius.circular(_open ? 24 : 16)),
+      clipBehavior: Clip.antiAlias,
+      child: AnimatedSize(duration: const Duration(milliseconds: 320), curve: Curves.easeOutCubic, alignment: Alignment.topCenter,
+        child: Column(children: [
+          ListTile(
+            leading: Icon(widget.icon), title: Text(widget.title),
+            subtitle: Text(widget.value > 0 ? '${_txt(widget.value)} ${widget.unit}' : (isFr ? 'Non renseigné' : 'Not set')),
+            trailing: AnimatedRotation(turns: _open ? 0.5 : 0, duration: const Duration(milliseconds: 320), child: const Icon(Icons.expand_more_rounded)),
+            onTap: () => setState(() { _open = !_open; if (_open) _ctrl.text = widget.value > 0 ? _txt(widget.value) : ''; })),
+          if (_open) Padding(padding: const EdgeInsets.fromLTRB(16, 0, 16, 14), child: Row(children: [
+            Expanded(child: TextField(controller: _ctrl, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                decoration: InputDecoration(suffixText: widget.unit, filled: true, fillColor: s.surfaceContainerHigh,
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none)))),
+            const SizedBox(width: 10),
+            FilledButton(onPressed: () {
+              final v = double.tryParse(_ctrl.text.replaceAll(',', '.'));
+              if (v != null) widget.onSave(v);
+              setState(() => _open = false);
+            }, child: Text(isFr ? 'OK' : 'OK')),
+          ])),
+        ]),
+      ),
+    ));
+  }
 }

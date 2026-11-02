@@ -25,13 +25,6 @@ class _HealthCachePageState extends State<HealthCachePage> {
 
   String _fmt(int b) => b < 1024 ? '$b B' : b < 1048576 ? '${(b / 1024).toStringAsFixed(0)} KB' : '${(b / 1048576).toStringAsFixed(1)} MB';
 
-  Future<void> _ask(String title, String msg, Future<void> Function() run) async {
-    final ok = await confirmDialog(context, title: title, message: msg, ok: isFr ? 'Vider' : 'Clear', icon: Icons.delete_outline_rounded);
-    if (!ok) return;
-    await run();
-    await _refresh();
-  }
-
   @override
   Widget build(BuildContext context) {
     final hs = HealthService.instance;
@@ -54,17 +47,16 @@ class _HealthCachePageState extends State<HealthCachePage> {
         SettingsSection(label: isFr ? 'Actions' : 'Actions', children: [
           SettingActionRow(icon: Icons.sync_rounded, title: isFr ? 'Resynchroniser maintenant' : 'Sync now',
               onTap: () => hs.permitted ? hs.sync() : hs.requestPermissions()),
-          SettingActionRow(icon: Icons.map_outlined, title: isFr ? 'Vider les tracés' : 'Clear routes',
+          InlineConfirm(icon: Icons.map_outlined, title: isFr ? 'Vider les tracés' : 'Clear routes', okLabel: isFr ? 'Vider' : 'Clear',
               subtitle: isFr ? 'Relus depuis Health Connect' : 'Read again from Health Connect',
-              onTap: () => _ask(isFr ? 'Vider les tracés ?' : 'Clear routes?',
-                  isFr ? 'Les tracés de la carte (${_fmt(_sizes.$2)}) seront supprimés.' : 'Map routes (${_fmt(_sizes.$2)}) will be deleted.', hs.clearTracks)),
-          SettingActionRow(icon: Icons.fitness_center_rounded, title: isFr ? 'Vider les activités' : 'Clear activities',
-              onTap: () => _ask(isFr ? 'Vider les activités ?' : 'Clear activities?',
-                  isFr ? 'Les activités enregistrées (${_fmt(_sizes.$1)}) seront supprimées jusqu\'à la prochaine synchro.' : 'Saved activities (${_fmt(_sizes.$1)}) will be deleted until the next sync.', hs.clearActivities)),
-          SettingActionRow(icon: Icons.delete_forever_rounded, danger: true, title: isFr ? 'Tout vider' : 'Clear everything',
-              onTap: () => _ask(isFr ? 'Tout vider ?' : 'Clear everything?',
-                  isFr ? 'Activités, jours et tracés seront supprimés, puis relus depuis Health Connect.' : 'Activities, days and routes will be deleted, then read again from Health Connect.',
-                  () async { await hs.clearCache(); hs.sync(); })),
+              message: isFr ? 'Les tracés de la carte (${_fmt(_sizes.$2)}) seront supprimés.' : 'Map routes (${_fmt(_sizes.$2)}) will be deleted.',
+              onConfirm: () async { await hs.clearTracks(); await _refresh(); }),
+          InlineConfirm(icon: Icons.fitness_center_rounded, title: isFr ? 'Vider les activités' : 'Clear activities', okLabel: isFr ? 'Vider' : 'Clear',
+              message: isFr ? 'Les activités enregistrées (${_fmt(_sizes.$1)}) seront supprimées jusqu\'à la prochaine synchro.' : 'Saved activities (${_fmt(_sizes.$1)}) will be deleted until the next sync.',
+              onConfirm: () async { await hs.clearActivities(); await _refresh(); }),
+          InlineConfirm(icon: Icons.delete_forever_rounded, danger: true, title: isFr ? 'Tout vider' : 'Clear everything', okLabel: isFr ? 'Tout vider' : 'Clear all',
+              message: isFr ? 'Activités, jours et tracés seront supprimés, puis relus depuis Health Connect.' : 'Activities, days and routes will be deleted, then read again from Health Connect.',
+              onConfirm: () async { await hs.clearCache(); hs.sync(); await _refresh(); }),
         ]),
       ]))),
     );

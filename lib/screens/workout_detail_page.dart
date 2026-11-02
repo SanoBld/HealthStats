@@ -37,7 +37,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   void initState() {
     super.initState();
     final hs = HealthService.instance, w = widget.workout;
-    Future.wait([if (w.hasRoute) hs.route(w, ask: true) else Future.value(<RoutePoint>[]), hs.heartRate(w)]).then((r) {
+    Future.wait([if (w.hasRoute || w.sport.outdoor) hs.route(w, ask: true) else Future.value(<RoutePoint>[]), hs.heartRate(w)]).then((r) {
       if (!mounted) return;
       setState(() { _route = r[0] as List<RoutePoint>; _hr = r[1] as List<(DateTime, int)>; _loading = false; });
     });
@@ -124,7 +124,10 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
                 const SimpleAttributionWidget(source: Text('OpenStreetMap')),
               ],
             ))))
-        else if (_loading && w.hasRoute) const SizedBox(height: 120, child: Center(child: M3LoadingIndicator(size: 56))),
+        else if (_loading && (w.hasRoute || sp.outdoor)) const SizedBox(height: 120, child: Center(child: M3LoadingIndicator(size: 56)))
+        else if (w.hasRoute) Padding(padding: const EdgeInsets.all(16), child: FilledButton.icon(
+            onPressed: () { setState(() => _loading = true); HealthService.instance.route(w, ask: true).then((r) { if (mounted) setState(() { _route = r; _loading = false; }); }); },
+            icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Autoriser et afficher le tracé' : 'Allow and show the route'))),
         Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 4), child: Row(children: [
           Icon(sp.icon, color: col), const SizedBox(width: 8),
           Expanded(child: Text('${sportName(sp)} · ${fmtDate(w.start)}', style: t.titleMedium)),

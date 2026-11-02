@@ -94,7 +94,8 @@ class _SubPage extends StatelessWidget {
 void _open(BuildContext c, Widget page) => Navigator.push(c, MaterialPageRoute(builder: (_) => page));
 
 class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
+  final bool pushed; // opened from the profile: show a back button
+  const SettingsPage({super.key, this.pushed = false});
 
   Widget _card(BuildContext c, IconData i, String title, String sub, Widget page) => SettingTile(
         leading: Icon(i), title: Text(title), subtitle: Text(sub),
@@ -104,7 +105,7 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) => ListenableBuilder(
         listenable: _watch,
         builder: (ctx, _) => SafeArea(child: ListView(padding: const EdgeInsets.only(bottom: 40), children: [
-          M3PageHeader(showBack: false, title: L.navSettings),
+          M3PageHeader(showBack: pushed, title: L.navSettings),
           SettingsSection(label: isFr ? 'Compte' : 'Account', children: [
             _card(ctx, Icons.person_rounded, profileNameNotifier.value.isEmpty ? (isFr ? 'Profil' : 'Profile') : profileNameNotifier.value,
                 isFr ? 'Nom, taille, poids, naissance, objectifs' : 'Name, height, weight, birth, goals',
@@ -132,19 +133,6 @@ class SettingsPage extends StatelessWidget {
       );
 }
 
-/// Small dialog to type a number (height, weight). Returns null if cancelled.
-Future<double?> _numDialog(BuildContext c, String title, double cur) {
-  final ctrl = TextEditingController(text: cur > 0 ? '$cur'.replaceAll(RegExp(r'\.0$'), '') : '');
-  return showDialog<double>(context: c, builder: (_) => AlertDialog(
-    title: Text(title),
-    content: TextField(controller: ctrl, autofocus: true, keyboardType: const TextInputType.numberWithOptions(decimal: true)),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(c), child: Text(isFr ? 'Annuler' : 'Cancel')),
-      FilledButton(onPressed: () => Navigator.pop(c, double.tryParse(ctrl.text.replaceAll(',', '.')) ?? 0), child: Text(L.commonSave)),
-    ],
-  ));
-}
-
 List<Widget> _profileRows(BuildContext ctx) {
   final birth = parseBirth(profileBirthNotifier.value);
   return [
@@ -160,20 +148,10 @@ List<Widget> _profileRows(BuildContext ctx) {
             final d = await pickBirthDate(ctx, birth);
             if (d != null) profileBirthNotifier.value = birthToStr(d);
           }),
-      SettingTile(leading: const Icon(Icons.height_rounded), title: Text(isFr ? 'Taille' : 'Height'),
-          subtitle: Text(profileHeightNotifier.value > 0 ? '${profileHeightNotifier.value.round()} cm' : (isFr ? 'Non renseignée' : 'Not set')),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () async {
-            final v = await _numDialog(ctx, isFr ? 'Taille (cm)' : 'Height (cm)', profileHeightNotifier.value);
-            if (v != null) profileHeightNotifier.value = v;
-          }),
-      SettingTile(leading: const Icon(Icons.monitor_weight_rounded), title: Text(isFr ? 'Poids' : 'Weight'),
-          subtitle: Text(profileWeightNotifier.value > 0 ? '${profileWeightNotifier.value} kg' : (isFr ? 'Non renseigné' : 'Not set')),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () async {
-            final v = await _numDialog(ctx, isFr ? 'Poids (kg)' : 'Weight (kg)', profileWeightNotifier.value);
-            if (v != null) profileWeightNotifier.value = v;
-          }),
+      InlineNumberTile(icon: Icons.height_rounded, title: isFr ? 'Taille' : 'Height', unit: 'cm',
+          value: profileHeightNotifier.value, onSave: (v) => profileHeightNotifier.value = v),
+      InlineNumberTile(icon: Icons.monitor_weight_rounded, title: isFr ? 'Poids' : 'Weight', unit: 'kg',
+          value: profileWeightNotifier.value, onSave: (v) => profileWeightNotifier.value = v),
       SettingChoiceRow(icon: Icons.wc_rounded, title: isFr ? 'Sexe' : 'Sex',
           options: [('m', isFr ? 'Homme' : 'Male', null), ('f', isFr ? 'Femme' : 'Female', null), ('x', isFr ? 'Autre' : 'Other', null)],
           value: profileSexNotifier.value.isEmpty ? 'x' : profileSexNotifier.value, onChanged: (v) => profileSexNotifier.value = v),
@@ -203,8 +181,6 @@ List<Widget> _healthRows(BuildContext ctx) {
       SettingActionRow(icon: Icons.sync_rounded, title: isFr ? 'Synchroniser maintenant' : 'Sync now', onTap: () => hs.permitted ? hs.sync() : hs.requestPermissions()),
       SettingActionRow(icon: Icons.verified_user_rounded, title: isFr ? 'Redemander les autorisations' : 'Request permissions again', onTap: hs.requestPermissions),
       SettingActionRow(icon: Icons.lock_open_rounded, title: isFr ? 'Gérer dans Health Connect' : 'Manage in Health Connect', onTap: hs.openHealthConnect),
-      SettingActionRow(icon: Icons.delete_outline_rounded, title: isFr ? 'Vider le cache local' : 'Clear local cache',
-          subtitle: isFr ? 'Demande une confirmation' : 'Asks for confirmation', onTap: () => confirmClearCache(ctx)),
     ]),
   ];
 }

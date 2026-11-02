@@ -4,8 +4,9 @@ import '../app_state.dart';
 import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
+import '../widgets/m3_components.dart' show M3CookieBadge;
 import '../widgets/skeleton.dart' show M3LoadingIndicator;
-import 'settings_page.dart' show showProfileSheet;
+import 'settings_page.dart' show SettingsPage;
 import 'workout_detail_page.dart';
 
 class DashboardPage extends StatelessWidget {
@@ -42,9 +43,9 @@ class DashboardPage extends StatelessWidget {
                   alignment: Alignment.bottomLeft,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(16),
-                    onTap: () => showProfileSheet(ctx),
+                    onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const Scaffold(body: SettingsPage(pushed: true)))),
                     child: Row(children: [
-                      CircleAvatar(radius: 30, backgroundColor: s.primary,
+                      M3CookieBadge(color: s.primary, size: 62,
                           child: Text(profileNameNotifier.value.isEmpty ? '?' : profileNameNotifier.value[0].toUpperCase(),
                               style: t.headlineSmall?.copyWith(color: s.onPrimary, fontWeight: FontWeight.w800))),
                       const SizedBox(width: 14),
