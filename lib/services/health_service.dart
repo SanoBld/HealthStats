@@ -37,6 +37,7 @@ class HealthService extends ChangeNotifier {
   Future<bool> ensurePerm(String name) async {
     if (hasPerm(name)) return true;
     await requestPermissions();
+    await refreshStatus(); // trust Health Connect, not only the dialog result
     if (!hasPerm(name)) { await openHealthConnect(); }
     return hasPerm(name);
   }
@@ -200,7 +201,18 @@ class HealthService extends ChangeNotifier {
       routeError = null;
       if (pts.isNotEmpty && maxPoints == 0) _routes[w.id] = pts;
       return pts;
-    } catch (e) { routeError = '$e'; return []; }
+    } catch (e) {
+      final m = '$e';
+      final fr = localeNotifier.value == 'fr';
+      routeError = m.contains('no_route')
+          ? (fr ? 'Health Connect n’a aucun tracé GPS pour cette séance : l’app qui l’a enregistrée ne l’a pas envoyé.'
+                  : 'Health Connect has no GPS route for this session: the app that recorded it did not send one.')
+          : m.contains('consent_denied')
+              ? (fr ? 'L’accès au tracé a été refusé ou fermé. Appuie sur le bouton et choisis « Autoriser ».'
+                      : 'Route access was refused or closed. Tap the button and choose “Allow”.')
+              : m;
+      return [];
+    }
   }
 
   /// Loads small tracks for the map (6 at a time, small routes), saves them on disk.

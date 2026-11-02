@@ -207,10 +207,11 @@ class HealthBridge(private val ctx: Context) {
                 else if (ask != null) {
                     // the user may have accepted: read the record again
                     val again = client.readRecord(ExerciseSessionRecord::class, sessionId).record.exerciseRouteResult
-                    if (again is ExerciseRouteResult.Data) pts(again.exerciseRoute) else emptyList()
+                    if (again is ExerciseRouteResult.Data) pts(again.exerciseRoute)
+                    else throw IllegalStateException("consent_denied")
                 } else emptyList()
             }
-            else -> emptyList()
+            else -> if (ask != null) throw IllegalStateException("no_route") else emptyList()
         }
         // [max] > 0: keep ~max points only (small and fast for the map tab)
         if (max <= 0 || all.size <= max) return all

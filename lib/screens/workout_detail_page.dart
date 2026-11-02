@@ -150,8 +150,6 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
     return Scaffold(
       appBar: AppBar(title: Text(w.title.isNotEmpty ? w.title : sportName(sp))),
       body: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
-        if (pts.length < 2 && (w.hasRoute || sp.outdoor)) PermPrompt(perm: 'READ_EXERCISE_ROUTE', icon: Icons.map_rounded, onGranted: _load,
-            text: isFr ? 'Autorise l’accès aux tracés GPS pour voir la carte.' : 'Allow access to GPS routes to see the map.'),
         if (pts.length > 1) SizedBox(height: 280, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
           child: ClipRRect(borderRadius: BorderRadius.circular(16),
             child: FlutterMap(
@@ -168,20 +166,19 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
               ],
             ))))
         else if (_loading && (w.hasRoute || sp.outdoor)) const SizedBox(height: 120, child: Center(child: M3LoadingIndicator(size: 56)))
-        else if (w.hasRoute || (sp.outdoor && _routeTried)) AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Padding(
+        else if (_routeTried && (w.hasRoute || sp.outdoor)) AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Padding(
             key: ValueKey(_loading), padding: const EdgeInsets.all(16), child: _loading
               ? const SizedBox(height: 56, child: Center(child: M3LoadingIndicator(size: 40)))
               : Column(children: [
-                  if (_routeTried && w.hasRoute) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(isFr
-                      ? 'Le tracé n’a pas pu être lu.${HealthService.instance.routeError == null ? '' : '\n${HealthService.instance.routeError}'}'
-                      : 'The route could not be read.${HealthService.instance.routeError == null ? '' : '\n${HealthService.instance.routeError}'}',
+                  if (_routeTried) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(
+                      HealthService.instance.routeError ?? (isFr ? 'Aucun tracé lu pour cette séance.' : 'No route read for this session.'),
                       textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: s.onSurfaceVariant))),
-                  if (w.hasRoute) FilledButton.icon(
+                  if (HealthService.instance.routeError?.contains('aucun') != true && HealthService.instance.routeError?.contains('no GPS') != true) FilledButton.icon(
                     onPressed: () {
                       setState(() => _loading = true);
                       HealthService.instance.route(w, ask: true).then((r) { if (mounted) setState(() { _route = r; _loading = false; _routeTried = true; }); });
                     },
-                    icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Autoriser et afficher le tracé' : 'Allow and show the route')),
+                    icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Réessayer' : 'Try again')),
                 ]))),
         Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 4), child: Row(children: [
           Icon(sp.icon, color: col), const SizedBox(width: 8),

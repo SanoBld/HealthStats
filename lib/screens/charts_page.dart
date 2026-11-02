@@ -161,7 +161,7 @@ class _MetricChartState extends State<_MetricChart> {
   @override
   Widget build(BuildContext c) {
     final m = widget.spec, hs = HealthService.instance;
-    return ListenableBuilder(listenable: hs, builder: (_, __) {
+    return ListenableBuilder(listenable: hs, builder: (_, _) {
       if (!hs.hasPerm(m.perm)) {
         // only offer it once the rest is connected
         if (!hs.permitted) return const SizedBox.shrink();

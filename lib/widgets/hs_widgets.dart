@@ -607,7 +607,7 @@ class _PermPromptState extends State<PermPrompt> {
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, hs = HealthService.instance;
-    return ListenableBuilder(listenable: hs, builder: (_, __) => AnimatedSize(
+    return ListenableBuilder(listenable: hs, builder: (_, _) => AnimatedSize(
       duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic,
       child: hs.hasPerm(widget.perm) ? const SizedBox(width: double.infinity) : Container(
         margin: const EdgeInsets.fromLTRB(16, 4, 16, 8), padding: const EdgeInsets.all(14),
