@@ -40,6 +40,7 @@ class HealthBridge(private val ctx: Context) {
             HealthPermission.getReadPermission(WeightRecord::class),
             HealthPermission.getReadPermission(HeightRecord::class),
             HealthPermission.getReadPermission(SpeedRecord::class),
+            HealthPermission.getReadPermission(PowerRecord::class),
             ROUTE_PERM,
             HISTORY_PERM,
         )
@@ -182,7 +183,15 @@ class HealthBridge(private val ctx: Context) {
         val rec = client.readRecord(ExerciseSessionRecord::class, sessionId).record
         val all = when (val r = rec.exerciseRouteResult) {
             is ExerciseRouteResult.Data -> pts(r.exerciseRoute)
-            is ExerciseRouteResult.ConsentRequired -> ask?.invoke(sessionId)?.let { pts(it) } ?: emptyList()
+            is ExerciseRouteResult.ConsentRequired -> {
+                val granted = ask?.invoke(sessionId)?.let { pts(it) }
+                if (granted != null && granted.isNotEmpty()) granted
+                else if (ask != null) {
+                    // the user may have accepted: read the record again
+                    val again = client.readRecord(ExerciseSessionRecord::class, sessionId).record.exerciseRouteResult
+                    if (again is ExerciseRouteResult.Data) pts(again.exerciseRoute) else emptyList()
+                } else emptyList()
+            }
             else -> emptyList()
         }
         // [max] > 0: keep ~max points only (small and fast for the map tab)
@@ -251,6 +260,31 @@ class HealthBridge(private val ctx: Context) {
             a = b
         }
         return out
+    }
+
+    /** Recorded curves of a session: [timeMs, value]. kind = speed (m/s) or power (W). */
+    suspend fun samples(kind: String, startMs: Long, endMs: Long): List<List<Double>> {
+        val out = ArrayList<List<Double>>()
+        val from = clampStart(startMs)
+        try {
+            var token: String? = null
+            do {
+                when (kind) {
+                    "speed" -> {
+                        val r = client.readRecords(ReadRecordsRequest(SpeedRecord::class, range(from, endMs), pageSize = 1000, pageToken = token))
+                        r.records.forEach { rec -> rec.samples.forEach { out.add(listOf(it.time.toEpochMilli().toDouble(), it.speed.inMetersPerSecond)) } }
+                        token = r.pageToken
+                    }
+                    "power" -> {
+                        val r = client.readRecords(ReadRecordsRequest(PowerRecord::class, range(from, endMs), pageSize = 1000, pageToken = token))
+                        r.records.forEach { rec -> rec.samples.forEach { out.add(listOf(it.time.toEpochMilli().toDouble(), it.power.inWatts)) } }
+                        token = r.pageToken
+                    }
+                    else -> token = null
+                }
+            } while (!token.isNullOrEmpty())
+        } catch (e: Exception) { /* permission missing or no data */ }
+        return out.sortedBy { it[0] }
     }
 
     suspend fun sleep(startMs: Long, endMs: Long): List<Map<String, Any?>> {

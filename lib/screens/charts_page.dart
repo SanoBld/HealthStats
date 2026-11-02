@@ -23,6 +23,7 @@ class _ChartsPageState extends State<ChartsPage> {
   _Period _period = _Period.week;
   int? _type;
   late final Future<List<(DateTime, double)>> _weights = HealthService.instance.weights();
+  late final Future<List<(DateTime, double)>> _sleep = HealthService.instance.sleepNights();
 
   String _label(_Metric m) => switch (m) {
         _Metric.sessions => isFr ? 'Séances' : 'Workouts',
@@ -152,6 +153,15 @@ extension _Trends on _ChartsPageState {
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
             values: st.map((d) => d.steps.toDouble()).toList(), color: p, unit: isFr ? 'pas' : 'steps', labelOf: (i) => lab(st[i].day))),
       ],
+      FutureBuilder<List<(DateTime, double)>>(future: _sleep, builder: (_, snap) {
+        final sl = (snap.data ?? const <(DateTime, double)>[]).where((e) => e.$2 > 0.5).toList();
+        if (sl.length < 2) return const SizedBox.shrink();
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SectionTitle(isFr ? 'Sommeil par nuit (90 j)' : 'Sleep per night (90d)'),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
+              values: sl.map((e) => e.$2).toList(), color: p, unit: 'h', decimals: 1, labelOf: (i) => lab(sl[i].$1))),
+        ]);
+      }),
       FutureBuilder<List<(DateTime, double)>>(future: _weights, builder: (_, snap) {
         final w = snap.data ?? const <(DateTime, double)>[];
         if (w.length < 2) return const SizedBox.shrink();

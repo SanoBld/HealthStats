@@ -6,6 +6,8 @@ import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.contracts.ExerciseRouteRequestContract
 import androidx.health.connect.client.records.ExerciseRoute
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import io.flutter.plugin.common.MethodChannel.Result
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -56,11 +58,15 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 
-    private suspend fun askRoute(id: String): ExerciseRoute? = withContext(Dispatchers.Main) {
-        val d = CompletableDeferred<ExerciseRoute?>()
-        routeWait = d
-        routeLauncher.launch(id)
-        d.await()
+    // One consent dialog at a time (several at once = the earlier ones never finished)
+    private val routeMutex = Mutex()
+    private suspend fun askRoute(id: String): ExerciseRoute? = routeMutex.withLock {
+        withContext(Dispatchers.Main) {
+            val d = CompletableDeferred<ExerciseRoute?>()
+            routeWait = d
+            routeLauncher.launch(id)
+            d.await()
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -159,6 +165,7 @@ class MainActivity : FlutterFragmentActivity() {
                                 "appInfo" -> bridge.appInfo((a?.get("pkgs") as? List<*>)?.map { it.toString() } ?: emptyList())
                                 "route" -> bridge.route(a!!["id"] as String, if (a["ask"] == true) { id: String -> askRoute(id) } else null, (a["max"] as? Number)?.toInt() ?: 0)
                                 "heartRate" -> bridge.heartRate(s, e)
+                                "samples" -> bridge.samples(a!!["kind"] as String, s, e)
                                 "daily" -> bridge.daily(s, e)
                                 "sleep" -> bridge.sleep(s, e)
                                 "weight" -> bridge.weight(s, e)

@@ -92,7 +92,12 @@ class SyncLoader extends StatelessWidget {
       );
 }
 
-String distLabel(double m) => unitsMetricNotifier.value ? '${fmtKm(m)} km' : '${(m / 1609.344).toStringAsFixed(2)} mi';
+String distLabel(double m) => unitsMetricNotifier.value
+    ? (m < 1000 ? '${m.round()} m' : '${fmtKm(m)} km')
+    : (m < 160 ? '${(m * 3.28084).round()} ft' : '${(m / 1609.344).toStringAsFixed(2)} mi');
+/// Speed in the user's unit (km/h or mph).
+double spdConv(double kmh) => unitsMetricNotifier.value ? kmh : kmh * 0.621371;
+String get spdUnit => unitsMetricNotifier.value ? 'km/h' : 'mph';
 
 class SectionTitle extends StatelessWidget {
   final String text; final Widget? trailing;
@@ -235,8 +240,8 @@ class _SparkPainter extends CustomPainter {
 }
 
 
-/// Line chart you can touch and drag: shows the value + a label under the finger
-/// and tells the parent where it is (0..1) so a map marker can follow.
+/// Line chart you can touch and drag (value + label under the finger, tells the parent where
+/// it is). Zoom: pinch with two fingers, +/- buttons, double tap; slider to move when zoomed.
 class ScrubChart extends StatefulWidget {
   final List<double> values; final Color color; final String unit; final int decimals; final double height;
   final String Function(int index)? labelOf;
@@ -248,41 +253,103 @@ class ScrubChart extends StatefulWidget {
 }
 
 class _ScrubChartState extends State<ScrubChart> {
-  double? _f;
+  double? _f;                // cursor inside the visible part (0..1)
+  double _zoom = 1, _lo = 0; // _lo = start of the visible part (0..1 of all data)
+  final Map<int, Offset> _ptr = {};
+  double _pd0 = 0, _z0 = 1, _g0 = 0;
 
-  void _set(double? f) {
+  double get _maxZoom { final n = widget.values.length; return n < 40 ? 1.0 : (n / 20).clamp(1.0, 24.0).toDouble(); }
+  double _clampLo(double lo, double z) => lo.clamp(0.0, 1 - 1 / z).toDouble();
+  double _dist() { final p = _ptr.values.toList(); return (p[0] - p[1]).distance; }
+
+  void _scrub(double? f) {
+    if (_ptr.length >= 2) return;
     setState(() => _f = f);
-    widget.onScrub?.call(f);
+    widget.onScrub?.call(f == null ? null : (_lo + f / _zoom).clamp(0.0, 1.0).toDouble());
+  }
+
+  void _zoomBy(double z, double focus) {
+    final nz = z.clamp(1.0, _maxZoom).toDouble();
+    final g = _lo + focus / _zoom;
+    setState(() { _zoom = nz; _lo = _clampLo(g - focus / nz, nz); _f = null; });
+  }
+
+  void _reset() => setState(() { _zoom = 1; _lo = 0; _f = null; });
+
+  @override
+  void didUpdateWidget(ScrubChart o) {
+    super.didUpdateWidget(o);
+    if (o.values.length != widget.values.length) { _zoom = 1; _lo = 0; _f = null; }
   }
 
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme;
-    return LayoutBuilder(builder: (_, box) {
-      double frac(Offset p) => ((p.dx - _kPad) / (box.maxWidth - _kPad)).clamp(0.0, 1.0).toDouble();
-      return GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onTapDown: (d) => _set(frac(d.localPosition)),
-        onTapUp: (_) => _set(null),
-        onTapCancel: () => _set(null),
-        onHorizontalDragStart: (d) => _set(frac(d.localPosition)),
-        onHorizontalDragUpdate: (d) => _set(frac(d.localPosition)),
-        onHorizontalDragEnd: (_) => _set(null),
-        onHorizontalDragCancel: () => _set(null),
-        child: SizedBox(height: widget.height, width: double.infinity, child: CustomPaint(
-            painter: _ScrubPainter(widget.values, widget.color, s.outlineVariant, s.onSurfaceVariant, s.surfaceContainerHighest,
-                s.onSurface, _f, widget.unit, widget.decimals, widget.labelOf))),
-      );
-    });
+    final n = widget.values.length;
+    final a = n < 2 ? 0 : (_lo * (n - 1)).floor().clamp(0, n - 1);
+    final b = n < 2 ? 0 : ((_lo + 1 / _zoom) * (n - 1)).ceil().clamp(a + 1, n - 1);
+    final vis = n < 2 ? widget.values : widget.values.sublist(a, b + 1);
+    return Column(children: [
+      LayoutBuilder(builder: (_, box) {
+        double frac(Offset p) => ((p.dx - _kPad) / (box.maxWidth - _kPad)).clamp(0.0, 1.0).toDouble();
+        return Listener(
+          onPointerDown: (e) {
+            _ptr[e.pointer] = e.localPosition;
+            if (_ptr.length == 2) {
+              _pd0 = _dist(); _z0 = _zoom;
+              final mid = (_ptr.values.first + _ptr.values.last) / 2;
+              _g0 = _lo + frac(mid) / _zoom;
+              setState(() => _f = null);
+            }
+          },
+          onPointerMove: (e) {
+            _ptr[e.pointer] = e.localPosition;
+            if (_ptr.length == 2 && _pd0 > 0 && _maxZoom > 1) {
+              final mid = (_ptr.values.first + _ptr.values.last) / 2;
+              final nz = (_z0 * _dist() / _pd0).clamp(1.0, _maxZoom).toDouble();
+              setState(() { _zoom = nz; _lo = _clampLo(_g0 - frac(mid) / nz, nz); });
+            }
+          },
+          onPointerUp: (e) { _ptr.remove(e.pointer); if (_ptr.length < 2) _pd0 = 0; },
+          onPointerCancel: (e) { _ptr.remove(e.pointer); if (_ptr.length < 2) _pd0 = 0; },
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (d) => _scrub(frac(d.localPosition)),
+            onTapUp: (_) => _scrub(null),
+            onTapCancel: () => _scrub(null),
+            onDoubleTap: () { if (_maxZoom <= 1) return; _zoom > 1 ? _reset() : _zoomBy(3, 0.5); },
+            onHorizontalDragStart: (d) => _scrub(frac(d.localPosition)),
+            onHorizontalDragUpdate: (d) => _scrub(frac(d.localPosition)),
+            onHorizontalDragEnd: (_) => _scrub(null),
+            onHorizontalDragCancel: () => _scrub(null),
+            child: SizedBox(height: widget.height, width: double.infinity, child: CustomPaint(
+                painter: _ScrubPainter(vis, a, widget.color, s.outlineVariant, s.onSurfaceVariant, s.surfaceContainerHighest,
+                    s.onSurface, _f, widget.unit, widget.decimals, widget.labelOf))),
+          ),
+        );
+      }),
+      if (_maxZoom > 1) AnimatedSize(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic, child: Column(children: [
+        Row(children: [
+          const SizedBox(width: 8),
+          Text(_zoom > 1 ? '×${_zoom.toStringAsFixed(1)}' : (isFr ? 'Pincer pour zoomer' : 'Pinch to zoom'),
+              style: Theme.of(c).textTheme.labelMedium?.copyWith(color: s.onSurfaceVariant)),
+          const Spacer(),
+          IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.zoom_out_rounded), onPressed: _zoom > 1 ? () => _zoomBy(_zoom / 1.6, 0.5) : null),
+          IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.zoom_in_rounded), onPressed: _zoom < _maxZoom ? () => _zoomBy(_zoom * 1.6, 0.5) : null),
+          IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.restart_alt_rounded), onPressed: _zoom > 1 ? _reset : null),
+        ]),
+        if (_zoom > 1) Slider(value: _lo.clamp(0.0, 1 - 1 / _zoom).toDouble(), max: 1 - 1 / _zoom, onChanged: (v) => setState(() { _lo = v; _f = null; })),
+      ])),
+    ]);
   }
 }
 
 const double _kPad = 34;
 
 class _ScrubPainter extends CustomPainter {
-  final List<double> v; final Color color, grid, text, bubble, bubbleText;
+  final List<double> v; final int start; final Color color, grid, text, bubble, bubbleText;
   final double? f; final String unit; final int decimals; final String Function(int)? labelOf;
-  _ScrubPainter(this.v, this.color, this.grid, this.text, this.bubble, this.bubbleText, this.f, this.unit, this.decimals, this.labelOf);
+  _ScrubPainter(this.v, this.start, this.color, this.grid, this.text, this.bubble, this.bubbleText, this.f, this.unit, this.decimals, this.labelOf);
 
   @override
   void paint(Canvas c, Size size) {
@@ -293,7 +360,6 @@ class _ScrubPainter extends CustomPainter {
     final w = size.width - _kPad, h = size.height - top - bottom;
     double xAt(int i) => _kPad + w * i / (v.length - 1);
     double yAt(double val) => top + h * (1 - (val - lo) / (hi - lo));
-    // grid + labels
     for (var k = 0; k < 3; k++) {
       final val = hi - (hi - lo) * k / 2, y = yAt(val);
       c.drawLine(Offset(_kPad, y), Offset(size.width, y), Paint()..color = grid.withValues(alpha: 0.5)..strokeWidth = 1);
@@ -309,28 +375,26 @@ class _ScrubPainter extends CustomPainter {
     c.drawPath(fill, Paint()..shader = LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter,
         colors: [color.withValues(alpha: 0.35), color.withValues(alpha: 0)]).createShader(Offset.zero & size));
     c.drawPath(path, Paint()..color = color..style = PaintingStyle.stroke..strokeWidth = 2.5..strokeJoin = StrokeJoin.round);
-    // cursor + bubble
     if (f != null) {
       final i = (f! * (v.length - 1)).round();
       final x = xAt(i), y = yAt(v[i]);
       c.drawLine(Offset(x, top - 4), Offset(x, size.height - bottom), Paint()..color = color.withValues(alpha: 0.6)..strokeWidth = 1.5);
       c.drawCircle(Offset(x, y), 6, Paint()..color = color);
       c.drawCircle(Offset(x, y), 6, Paint()..color = Colors.white..style = PaintingStyle.stroke..strokeWidth = 2);
-      final label = labelOf?.call(i);
+      final label = labelOf?.call(start + i);
       final tp = TextPainter(
           text: TextSpan(text: '${v[i].toStringAsFixed(decimals)} $unit${label == null ? '' : '  ·  $label'}',
               style: TextStyle(color: bubbleText, fontSize: 12, fontWeight: FontWeight.w700)),
           textDirection: TextDirection.ltr)..layout();
       final bw = tp.width + 16, bh = tp.height + 8;
       final bx = (x - bw / 2).clamp(0.0, size.width - bw).toDouble();
-      final r = RRect.fromRectAndRadius(Rect.fromLTWH(bx, 0, bw, bh), const Radius.circular(10));
-      c.drawRRect(r, Paint()..color = bubble);
+      c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(bx, 0, bw, bh), const Radius.circular(10)), Paint()..color = bubble);
       tp.paint(c, Offset(bx + 8, 4));
     }
   }
 
   @override
-  bool shouldRepaint(_ScrubPainter o) => o.f != f || o.v != v || o.color != color;
+  bool shouldRepaint(_ScrubPainter o) => o.f != f || o.v != v || o.color != color || o.start != start;
 }
 
 

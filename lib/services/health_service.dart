@@ -180,7 +180,7 @@ class HealthService extends ChangeNotifier {
   Future<List<RoutePoint>> route(Workout w, {bool ask = false, int maxPoints = 0}) async {
     if (maxPoints == 0 && _routes.containsKey(w.id)) return _routes[w.id]!;
     try {
-      final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask, 'max': maxPoints}).timeout(const Duration(seconds: 40))) ?? [];
+      final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask, 'max': maxPoints}).timeout(ask ? const Duration(minutes: 3) : const Duration(seconds: 40))) ?? [];
       final pts = r.map((e) {
         final l = (e as List).cast<num>();
         return RoutePoint(LatLng(l[0].toDouble(), l[1].toDouble()), l[2].toDouble(),
@@ -198,8 +198,9 @@ class HealthService extends ChangeNotifier {
     if (todo.isEmpty) return;
     trackBusy = true; trackProgress = 0; notifyListeners();
     var done = 0;
-    for (var i = 0; i < todo.length; i += 8) {
-      final batch = todo.skip(i).take(8).toList();
+    for (var i = 0; i < todo.length; i += ask ? 1 : 8) {
+      // with consent dialogs: one by one
+      final batch = todo.skip(i).take(ask ? 1 : 8).toList();
       await Future.wait(batch.map((w) async {
         final r = await route(w, ask: ask, maxPoints: 150);
         if (r.length > 1) {
@@ -223,6 +224,33 @@ class HealthService extends ChangeNotifier {
               {'start': w.start.millisecondsSinceEpoch, 'end': w.end.millisecondsSinceEpoch}).timeout(const Duration(seconds: 40))) ?? [];
       return r.map((e) { final l = (e as List).cast<num>();
         return (DateTime.fromMillisecondsSinceEpoch(l[0].toInt()), l[1].toInt()); }).toList();
+    } catch (_) { return []; }
+  }
+
+  /// Recorded curve of a session: kind = speed (m/s) or power (W).
+  Future<List<(DateTime, double)>> samples(String kind, Workout w) async {
+    try {
+      final r = (await _ch.invokeMethod<List>('samples', {'kind': kind,
+              'start': w.start.millisecondsSinceEpoch, 'end': w.end.millisecondsSinceEpoch}).timeout(const Duration(seconds: 40))) ?? [];
+      return r.map((e) { final l = (e as List).cast<num>();
+        return (DateTime.fromMillisecondsSinceEpoch(l[0].toInt()), l[1].toDouble()); }).toList();
+    } catch (_) { return []; }
+  }
+
+  /// Hours slept per night (last 90 days), by wake-up day.
+  Future<List<(DateTime, double)>> sleepNights() async {
+    try {
+      final r = (await _ch.invokeMethod<List>('sleep', {
+            'start': DateTime.now().subtract(const Duration(days: 90)).millisecondsSinceEpoch,
+            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
+      final per = <DateTime, double>{};
+      for (final e in r) {
+        final m = e as Map;
+        final a = DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()), b = DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt());
+        final day = DateTime(b.year, b.month, b.day);
+        per[day] = (per[day] ?? 0) + b.difference(a).inMinutes / 60;
+      }
+      return per.entries.map((e) => (e.key, e.value)).toList()..sort((a, b) => a.$1.compareTo(b.$1));
     } catch (_) { return []; }
   }
 

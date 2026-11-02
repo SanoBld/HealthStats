@@ -191,9 +191,19 @@ class RoutePoint {
 }
 
 // ── Formatting ───────────────────────────────────────────────────────────
+/// 45 s · 7 min 30 s · 42 min · 1 h 05 min (right unit for the size)
 String fmtDuration(Duration d) {
+  final sec = d.inSeconds;
+  if (sec < 60) return '$sec s';
+  final h = d.inHours, m = d.inMinutes % 60, s = sec % 60;
+  if (h > 0) return '$h h ${m.toString().padLeft(2, '0')} min';
+  return d.inMinutes < 10 && s > 0 ? '$m min ${s.toString().padLeft(2, '0')} s' : '$m min';
+}
+/// Clock style for chart cursors: 4:05 or 1:04:05
+String fmtClock(Duration d) {
   final h = d.inHours, m = d.inMinutes % 60, s = d.inSeconds % 60;
-  return h > 0 ? '${h}h${m.toString().padLeft(2, '0')}' : '$m:${s.toString().padLeft(2, '0')}';
+  final ss = s.toString().padLeft(2, '0');
+  return h > 0 ? '$h:${m.toString().padLeft(2, '0')}:$ss' : '${d.inMinutes}:$ss';
 }
 String fmtKm(double m) => (m / 1000).toStringAsFixed(m >= 10000 ? 1 : 2);
 String fmtPace(double? p) {

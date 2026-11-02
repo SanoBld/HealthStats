@@ -30,22 +30,44 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   static const _calm = {79, 83, 71, 48, 33};
   List<RoutePoint> _route = [];
   List<(DateTime, int)> _hr = [];
+  List<(DateTime, double)> _spd = [], _pow = [];
   bool _loading = true;
+  bool _routeTried = false; // consent dialog already shown once
   LatLng? _cur; // point shown on the map while touching a chart
 
   @override
   void initState() {
     super.initState();
     final hs = HealthService.instance, w = widget.workout;
-    Future.wait([if (w.hasRoute || w.sport.outdoor) hs.route(w, ask: true) else Future.value(<RoutePoint>[]), hs.heartRate(w)]).then((r) {
+    final wantRoute = w.hasRoute || w.sport.outdoor;
+    Future.wait([
+      wantRoute ? hs.route(w, ask: true) : Future.value(<RoutePoint>[]),
+      hs.heartRate(w),
+      hs.samples('speed', w),
+      hs.samples('power', w),
+    ]).then((r) {
       if (!mounted) return;
-      setState(() { _route = r[0] as List<RoutePoint>; _hr = r[1] as List<(DateTime, int)>; _loading = false; });
+      setState(() {
+        _route = r[0] as List<RoutePoint>; _hr = r[1] as List<(DateTime, int)>;
+        _spd = r[2] as List<(DateTime, double)>; _pow = r[3] as List<(DateTime, double)>;
+        _loading = false; _routeTried = true;
+      });
     });
   }
 
-  String _clock(Duration d) {
-    final m = d.inMinutes, sec = d.inSeconds % 60;
-    return '${m.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
+  String _clock(Duration d) => fmtClock(d);
+
+  /// Time-based cursor: finds the route point nearest in time and moves the map marker.
+  void _timeCursor(List<(DateTime, double)> data, double? f) {
+    if (_route.isEmpty || data.isEmpty) return;
+    if (f == null) { setState(() => _cur = null); return; }
+    final t = data[(f * (data.length - 1)).round()].$1;
+    var best = 0, bestD = 1 << 62;
+    for (var i = 0; i < _route.length; i++) {
+      final dd = _route[i].time.difference(t).inMilliseconds.abs();
+      if (dd < bestD) { bestD = dd; best = i; }
+    }
+    setState(() => _cur = _route[best].pos);
   }
 
   /// Smoothed speed (km/h) along the route.
@@ -102,7 +124,9 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
     final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
     final pts = _route.map((p) => p.pos).toList();
     final alts = _route.map((p) => p.alt).where((a) => !a.isNaN).toList();
-    final speeds = _speeds();
+    // recorded speed curve if the app wrote one, else computed from the GPS route
+    final recSpeed = _spd.length > 5;
+    final speeds = recSpeed ? _spd.map((e) => spdConv(e.$2 * 3.6)).toList() : _speeds().map(spdConv).toList();
     final birth = parseBirth(profileBirthNotifier.value);
     final age = birth == null ? null : (DateTime.now().difference(birth).inDays / 365.25).floor();
     final maxHr = age != null ? 220 - age : (w.hrMax > 0 ? w.hrMax.round() : 190);
@@ -125,9 +149,21 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
               ],
             ))))
         else if (_loading && (w.hasRoute || sp.outdoor)) const SizedBox(height: 120, child: Center(child: M3LoadingIndicator(size: 56)))
-        else if (w.hasRoute) Padding(padding: const EdgeInsets.all(16), child: FilledButton.icon(
-            onPressed: () { setState(() => _loading = true); HealthService.instance.route(w, ask: true).then((r) { if (mounted) setState(() { _route = r; _loading = false; }); }); },
-            icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Autoriser et afficher le tracé' : 'Allow and show the route'))),
+        else if (w.hasRoute || (sp.outdoor && _routeTried)) AnimatedSwitcher(duration: const Duration(milliseconds: 250), child: Padding(
+            key: ValueKey(_loading), padding: const EdgeInsets.all(16), child: _loading
+              ? const SizedBox(height: 56, child: Center(child: M3LoadingIndicator(size: 40)))
+              : Column(children: [
+                  if (_routeTried && w.hasRoute) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(isFr
+                      ? 'Le tracé n’a pas pu être lu. Réessaie : autorise l’accès dans la fenêtre Health Connect.'
+                      : 'The route could not be read. Try again and allow access in the Health Connect window.',
+                      textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: s.onSurfaceVariant))),
+                  if (w.hasRoute) FilledButton.icon(
+                    onPressed: () {
+                      setState(() => _loading = true);
+                      HealthService.instance.route(w, ask: true).then((r) { if (mounted) setState(() { _route = r; _loading = false; _routeTried = true; }); });
+                    },
+                    icon: const Icon(Icons.map_rounded), label: Text(isFr ? 'Autoriser et afficher le tracé' : 'Allow and show the route')),
+                ]))),
         Padding(padding: const EdgeInsets.fromLTRB(20, 16, 20, 4), child: Row(children: [
           Icon(sp.icon, color: col), const SizedBox(width: 8),
           Expanded(child: Text('${sportName(sp)} · ${fmtDate(w.start)}', style: t.titleMedium)),
@@ -140,7 +176,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
           if (w.paceMinKm != null && (w.type == 56 || w.type == 79 || w.type == 37 || w.type == 57))
             StatTile(icon: Icons.speed_rounded, value: fmtPace(w.paceMinKm), label: isFr ? 'Allure /km' : 'Pace /km', color: col),
           if (w.speedKmh != null && w.type != 56 && w.type != 79 && w.type != 37 && w.type != 57)
-            StatTile(icon: Icons.speed_rounded, value: '${w.speedKmh!.toStringAsFixed(1)} km/h', label: isFr ? 'Vitesse moy.' : 'Avg speed', color: col),
+            StatTile(icon: Icons.speed_rounded, value: '${spdConv(w.speedKmh!).toStringAsFixed(1)} $spdUnit', label: isFr ? 'Vitesse moy.' : 'Avg speed', color: col),
           if (w.kcal > 0) StatTile(icon: Icons.local_fire_department_rounded, value: '${w.kcal.round()}', label: 'kcal', color: col),
           if (w.steps > 0) StatTile(icon: Icons.directions_walk_rounded, value: '${w.steps}', label: isFr ? 'Pas' : 'Steps', color: col),
           if (w.hrAvg > 0) StatTile(icon: Icons.favorite_rounded, value: '${w.hrAvg.round()} bpm', label: isFr ? 'FC moyenne' : 'Avg HR', color: col),
@@ -165,7 +201,15 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
         if (speeds.length > 1) ...[
           SectionTitle(isFr ? 'Vitesse' : 'Speed'),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
-              values: speeds, color: col, unit: 'km/h', decimals: 1, onScrub: _routeCursor)),
+              values: speeds, color: col, unit: spdUnit, decimals: 1,
+              labelOf: recSpeed ? (i) => _clock(_spd[i].$1.difference(w.start)) : null,
+              onScrub: recSpeed ? (f) => _timeCursor(_spd, f) : _routeCursor)),
+        ],
+        if (_pow.length > 5) ...[
+          SectionTitle(isFr ? 'Puissance' : 'Power'),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
+              values: _pow.map((e) => e.$2).toList(), color: col, unit: 'W',
+              labelOf: (i) => _clock(_pow[i].$1.difference(w.start)), onScrub: (f) => _timeCursor(_pow, f))),
         ],
         if (sp.strength) ...[
           SectionTitle(isFr ? 'Séries' : 'Sets'),
