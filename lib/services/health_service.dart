@@ -197,6 +197,7 @@ class HealthService extends ChangeNotifier {
         return RoutePoint(LatLng(l[0].toDouble(), l[1].toDouble()), l[2].toDouble(),
             DateTime.fromMillisecondsSinceEpoch(l[3].toInt()));
       }).toList();
+      routeError = null;
       if (pts.isNotEmpty && maxPoints == 0) _routes[w.id] = pts;
       return pts;
     } catch (e) { routeError = '$e'; return []; }

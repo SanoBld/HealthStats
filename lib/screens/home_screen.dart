@@ -28,6 +28,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState st) {
     final hs = HealthService.instance;
+    // back from Health Connect: re-read which permissions are granted now
+    if (st == AppLifecycleState.resumed) { hs.refreshStatus(); }
     if (st == AppLifecycleState.resumed && hs.permitted &&
         (hs.lastSync == null || DateTime.now().difference(hs.lastSync!).inMinutes >= 5)) { hs.sync(); }
   }

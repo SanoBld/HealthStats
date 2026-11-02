@@ -38,8 +38,20 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
   @override
   void initState() {
     super.initState();
+    _hadRoutePerm = HealthService.instance.hasPerm('READ_EXERCISE_ROUTE');
+    HealthService.instance.addListener(_permWatch);
     _load();
   }
+
+  bool _hadRoutePerm = false;
+  // permission just granted (e.g. in Health Connect): load the route again by itself
+  void _permWatch() {
+    final now = HealthService.instance.hasPerm('READ_EXERCISE_ROUTE');
+    if (now && !_hadRoutePerm && mounted) { _hadRoutePerm = true; _load(); }
+  }
+
+  @override
+  void dispose() { HealthService.instance.removeListener(_permWatch); super.dispose(); }
 
   void _load() {
     final hs = HealthService.instance, w = widget.workout;
@@ -161,8 +173,8 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
               ? const SizedBox(height: 56, child: Center(child: M3LoadingIndicator(size: 40)))
               : Column(children: [
                   if (_routeTried && w.hasRoute) Padding(padding: const EdgeInsets.only(bottom: 8), child: Text(isFr
-                      ? 'Le tracé n’a pas pu être lu. Réessaie : autorise l’accès dans la fenêtre Health Connect.'
-                      : 'The route could not be read. Try again and allow access in the Health Connect window.',
+                      ? 'Le tracé n’a pas pu être lu.${HealthService.instance.routeError == null ? '' : '\n${HealthService.instance.routeError}'}'
+                      : 'The route could not be read.${HealthService.instance.routeError == null ? '' : '\n${HealthService.instance.routeError}'}',
                       textAlign: TextAlign.center, style: t.bodySmall?.copyWith(color: s.onSurfaceVariant))),
                   if (w.hasRoute) FilledButton.icon(
                     onPressed: () {
