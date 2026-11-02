@@ -21,6 +21,8 @@ dependencies:
   flutter_map: ^7.0.2        # carte OpenStreetMap (sans clé API)
   latlong2: ^0.9.1
   share_plus: ^10.1.4
+  file_picker: ^8.3.7
+  archive: ^3.6.1
 
 dev_dependencies:
   flutter_test:

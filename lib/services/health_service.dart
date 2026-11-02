@@ -8,6 +8,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:path_provider/path_provider.dart';
 import '../app_state.dart';
 import '../models/health_models.dart';
+import 'import_parser.dart';
 
 enum HcStatus { available, updateRequired, unavailable }
 
@@ -27,6 +28,12 @@ class HealthService extends ChangeNotifier {
   String stage = '';
   double? progress;
   final Map<String, List<RoutePoint>> _routes = {};
+  // ── Imported activities (GPX / FIT files) ──
+  List<Map<String, dynamic>> _imports = [];
+  final Map<String, List<RoutePoint>> _impRoutes = {};
+  final Map<String, List<(DateTime, int)>> _impHr = {};
+  bool importing = false;
+  int get importCount => _imports.length;
   final Set<String> _statsOk = {}; // sessions whose stats are already saved
   Set<String> grantedPerms = {};
   bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
@@ -107,6 +114,7 @@ class HealthService extends ChangeNotifier {
       final old = {for (final w in workouts) w.id: w};
       final liteWs = lite.map((e) => Workout.fromMap(Map.from(e as Map))).toList();
       workouts = [for (final w in liteWs) old[w.id] ?? w]..sort((x, y) => y.start.compareTo(x.start));
+      _applyImports();
       stage = _fr ? 'Calcul des statistiques (${workouts.length} activités)…' : 'Computing stats (${workouts.length} activities)…';
       progress = 0.4;
       notifyListeners();
@@ -123,6 +131,7 @@ class HealthService extends ChangeNotifier {
           final byId = {for (final w in workouts) w.id: w};
           for (final e in ws) { final w = Workout.fromMap(Map.from(e as Map)); byId[w.id] = w; _statsOk.add(w.id); }
           workouts = byId.values.toList()..sort((x, y) => y.start.compareTo(x.start));
+          _applyImports();
           fails = 0;
         } catch (e) {
           fails++;
@@ -145,6 +154,7 @@ class HealthService extends ChangeNotifier {
       } catch (_) {}
 
       lastSync = DateTime.now();
+      _applyImports();
       await _saveCache();
       _fillHeight();
       loadAppInfo();
@@ -190,6 +200,12 @@ class HealthService extends ChangeNotifier {
   /// [ask]: if Health Connect wants a per-session consent, show its dialog.
   /// [maxPoints] > 0 = small route (map tab), not kept in memory.
   Future<List<RoutePoint>> route(Workout w, {bool ask = false, int maxPoints = 0}) async {
+    final imp = _impRoutes[w.id];
+    if (imp != null) {
+      if (maxPoints <= 0 || imp.length <= maxPoints) return imp;
+      final step = (imp.length / maxPoints).ceil();
+      return [for (var i = 0; i < imp.length; i += step) imp[i]];
+    }
     if (maxPoints == 0 && _routes.containsKey(w.id)) return _routes[w.id]!;
     try {
       final r = (await _ch.invokeMethod<List>('route', {'id': w.id, 'ask': ask, 'max': maxPoints}).timeout(ask ? const Duration(minutes: 3) : const Duration(seconds: 40))) ?? [];
@@ -243,6 +259,13 @@ class HealthService extends ChangeNotifier {
 
   /// Heart-rate curve: [(time, bpm)].
   Future<List<(DateTime, int)>> heartRate(Workout w) async {
+    final imp = _impHr[w.id];
+    if (imp != null && w.id.startsWith('imp_')) return imp;
+    final r = await _heartRateHc(w);
+    return r.isEmpty && imp != null ? imp : r;
+  }
+
+  Future<List<(DateTime, int)>> _heartRateHc(Workout w) async {
     try {
       final r = (await _ch.invokeMethod<List>('heartRate',
               {'start': w.start.millisecondsSinceEpoch, 'end': w.end.millisecondsSinceEpoch}).timeout(const Duration(seconds: 40))) ?? [];
@@ -304,6 +327,80 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return []; }
   }
 
+  // ── Import GPX / FIT ──
+  /// Puts imported activities into [workouts]: a file that matches a session (start within 10 min)
+  /// gives that session its route / heart rate; otherwise it becomes a new activity.
+  /// Returns the ids of the imports that matched an existing session.
+  Set<String> _applyImports() {
+    final matched = <String>{};
+    _impRoutes.clear(); _impHr.clear();
+    if (_imports.isEmpty) { workouts = workouts.where((w) => !w.id.startsWith('imp_')).toList(); return matched; }
+    final out = workouts.where((w) => !w.id.startsWith('imp_')).toList();
+    for (final a in _imports) {
+      final s = DateTime.fromMillisecondsSinceEpoch((a['start'] as num).toInt());
+      final route = [for (final p in (a['route'] as List)) RoutePoint(LatLng((p[0] as num).toDouble(), (p[1] as num).toDouble()),
+          (p[2] as num).toDouble(), DateTime.fromMillisecondsSinceEpoch((p[3] as num).toInt()))];
+      final hr = [for (final p in (a['hr'] as List)) (DateTime.fromMillisecondsSinceEpoch((p[0] as num).toInt()), (p[1] as num).toInt())];
+      final i = out.indexWhere((w) => w.start.difference(s).inMinutes.abs() <= 10);
+      final id = i >= 0 ? out[i].id : a['id'] as String;
+      if (route.length > 1) _impRoutes[id] = route;
+      if (hr.isNotEmpty) _impHr[id] = hr;
+      _statsOk.add(id);
+      final dist = (a['distanceM'] as num).toDouble(), kcal = (a['kcal'] as num).toDouble();
+      if (i >= 0) {
+        matched.add(a['id'] as String);
+        final w = out[i];
+        if ((route.length > 1 && !w.hasRoute) || (w.distanceM <= 0 && dist > 0) || (w.hrAvg <= 0 && hr.isNotEmpty)) {
+          out[i] = Workout.fromMap({...w.toMap(),
+            if (route.length > 1) 'hasRoute': true,
+            if (w.distanceM <= 0 && dist > 0) 'distanceM': dist,
+            if (w.hrAvg <= 0 && hr.isNotEmpty) ...{'hrAvg': a['hrAvg'], 'hrMax': a['hrMax'], 'hrMin': a['hrMin']}});
+        }
+      } else {
+        out.add(Workout.fromMap({
+          'id': id, 'type': a['type'], 'title': a['title'] ?? '', 'source': 'import',
+          'notes': a['guessed'] == true ? (_fr ? 'Sport deviné d’après la vitesse' : 'Sport guessed from the speed') : '',
+          'start': a['start'], 'end': a['end'], 'hasRoute': route.length > 1,
+          'distanceM': dist, 'activeKcal': kcal, 'totalKcal': kcal, 'steps': 0,
+          'hrAvg': a['hrAvg'], 'hrMax': a['hrMax'], 'hrMin': a['hrMin'], 'segments': const []}));
+      }
+    }
+    workouts = out..sort((x, y) => y.start.compareTo(x.start));
+    return matched;
+  }
+
+  Future<void> _saveImports() async {
+    try { await (await _f('hs_imports.json')).writeAsString(jsonEncode(_imports)); } catch (_) {}
+  }
+
+  /// Reads the chosen files (gpx, fit, .gz, Strava .zip) and adds them. Counts: new / matched with a session / unreadable.
+  Future<({int added, int matched, int already, int failed})> importFiles(List<String> paths) async {
+    importing = true; notifyListeners();
+    try {
+      final r = await parseImportFiles(paths);
+      final known = {for (final a in _imports) a['id'] as String};
+      var added = 0, already = 0;
+      final fresh = <String>{};
+      for (final a in r.acts) {
+        final id = 'imp_${a['start']}';
+        if (known.contains(id)) { already++; continue; }
+        a['id'] = id; _imports.add(a); known.add(id); fresh.add(id); added++;
+      }
+      final m = _applyImports();
+      await _saveImports();
+      await _saveCache();
+      loadTracks(workouts.where((w) => w.hasRoute).take(60).toList());
+      return (added: added, matched: m.where(fresh.contains).length, already: already, failed: r.errors.length);
+    } finally { importing = false; notifyListeners(); }
+  }
+
+  Future<void> clearImports() async {
+    _imports = []; _applyImports();
+    try { await (await _f('hs_imports.json')).delete(); } catch (_) {}
+    await _saveCache();
+    notifyListeners();
+  }
+
   // ── Disk cache ──
   Future<File> _f(String n) async => File('${(await getApplicationSupportDirectory()).path}/$n');
   Future<void> _saveCache() async {
@@ -329,6 +426,13 @@ class HealthService extends ChangeNotifier {
         _statsOk.addAll(j['si'] != null ? (j['si'] as List).cast<String>()
             : [for (final w in workouts) if (w.distanceM > 0 || w.hrAvg > 0 || w.kcal > 0 || w.steps > 0) w.id]);
         if (j['sync'] != null) lastSync = DateTime.fromMillisecondsSinceEpoch(j['sync'] as int);
+      }
+    } catch (_) {}
+    try {
+      final f = await _f('hs_imports.json');
+      if (await f.exists()) {
+        _imports = [for (final e in jsonDecode(await f.readAsString()) as List) Map<String, dynamic>.from(e as Map)];
+        _applyImports();
       }
     } catch (_) {}
     try {

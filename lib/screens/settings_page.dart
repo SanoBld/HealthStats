@@ -9,6 +9,7 @@ import '../widgets/m3_components.dart';
 import '../widgets/skeleton.dart' show M3Spinner;
 import '../widgets/update_install_sheet.dart';
 import 'health_cache_page.dart';
+import 'import_page.dart';
 import 'settings/settings_helpers.dart';
 import 'settings/settings_rows.dart';
 
@@ -118,6 +119,7 @@ class SettingsPage extends StatelessWidget {
                 _SubPage(title: isFr ? 'Apparence' : 'Appearance', rows: _appearanceRows)),
             _card(ctx, Icons.tune_rounded, isFr ? 'Préférences' : 'Preferences', isFr ? 'Langue, unités, haptique' : 'Language, units, haptics',
                 _SubPage(title: isFr ? 'Préférences' : 'Preferences', rows: _prefRows)),
+            _card(ctx, Icons.file_open_rounded, isFr ? 'Importer des activités' : 'Import activities', isFr ? 'Fichiers GPX / FIT, archive Strava' : 'GPX / FIT files, Strava archive', const ImportPage()),
             _card(ctx, Icons.storage_rounded, 'Cache', isFr ? 'Taille, tracés, vidage' : 'Size, routes, clearing', const HealthCachePage()),
             _card(ctx, Icons.system_update_rounded, isFr ? 'Mises à jour' : 'Updates', 'v${UpdateService.currentVersion}',
                 const _UpdatesPage()),

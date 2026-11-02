@@ -6,6 +6,7 @@ import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
 import '../widgets/m3_components.dart';
+import 'import_page.dart';
 import 'workout_detail_page.dart';
 
 class ActivitiesPage extends StatefulWidget {
@@ -42,7 +43,9 @@ class _ActivitiesPageState extends State<ActivitiesPage> {
         }
         return SafeArea(child: Column(children: [
           M3PageHeader(showBack: false, title: L.navActivities,
-              subtitle: _type == null && _src == null ? '${list.length}' : '${list.length} / ${hs.workouts.length}'),
+              subtitle: _type == null && _src == null ? '${list.length}' : '${list.length} / ${hs.workouts.length}',
+              actions: [IconButton(tooltip: isFr ? 'Importer GPX / FIT' : 'Import GPX / FIT', icon: const Icon(Icons.file_upload_outlined),
+                  onPressed: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => const ImportPage())))]),
           SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
             FilterChipButton(
               label: _type == null ? (isFr ? 'Tous les sports' : 'All sports') : sportName(sportOf(_type!)),

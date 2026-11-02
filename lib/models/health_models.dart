@@ -115,6 +115,7 @@ String sourceLabel(String pkg) {
     'com.sec.android.app.shealth.wearable': 'Galaxy Watch',
     'com.google.android.wearable.healthservices': 'Wear OS',
     'com.healthstats.app': 'HealthStats',
+    'import': 'Import GPX/FIT',
   };
   final k = known[pkg];
   if (k != null) return k;

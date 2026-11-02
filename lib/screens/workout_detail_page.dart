@@ -221,7 +221,7 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
               labelOf: recSpeed ? (i) => _clock(_spd[i].$1.difference(w.start)) : null,
               onScrub: recSpeed ? (f) => _timeCursor(_spd, f) : _routeCursor)),
         ],
-        if (_pow.length <= 5 && (w.type == 8 || w.type == 9)) PermPrompt(perm: 'READ_POWER', icon: Icons.bolt_rounded, onGranted: _load,
+        if (_pow.length <= 5 && w.source != 'import' && (w.type == 8 || w.type == 9)) PermPrompt(perm: 'READ_POWER', icon: Icons.bolt_rounded, onGranted: _load,
             text: isFr ? 'Autorise la puissance pour afficher ce graphe.' : 'Allow power data to show this chart.'),
         if (_pow.length > 5) ...[
           SectionTitle(isFr ? 'Puissance' : 'Power'),
