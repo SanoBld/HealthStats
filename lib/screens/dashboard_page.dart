@@ -6,9 +6,11 @@ import '../services/health_service.dart';
 import '../widgets/health_cards.dart';
 import '../widgets/hs_widgets.dart';
 import '../widgets/m3_components.dart' show M3CookieBadge;
+import '../widgets/scroll_status_bar.dart';
 import '../widgets/skeleton.dart' show M3LoadingIndicator;
 import 'metric_page.dart';
 import 'settings_page.dart' show SettingsPage;
+import 'sleep_detail_page.dart';
 import 'workout_detail_page.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -59,13 +61,21 @@ class _DashboardPageState extends State<DashboardPage> {
         final mon = DateTime.now().subtract(Duration(days: DateTime.now().weekday - 1));
         final week = hs.between(DateTime(mon.year, mon.month, mon.day), DateTime(mon.year, mon.month, mon.day).add(const Duration(days: 7)));
         void open(Workout w) => _push(WorkoutDetailPage(workout: w));
-        final fire = const Color(0xFFFF5A3C), blue = const Color(0xFF3D8BFF), violet = const Color(0xFF7C5CFF), red = const Color(0xFFFF2D55), green = const Color(0xFF34C759);
+        Color col(Color c) => sportColorsNotifier.value ? c : s.primary;
+        final fire = col(const Color(0xFFFF5A3C)),
+              blue = col(const Color(0xFF3D8BFF)),
+              violet = col(const Color(0xFF7C5CFF)),
+              red = col(const Color(0xFFFF2D55)),
+              green = col(const Color(0xFF34C759));
 
         List<(DateTime, double)> daily(double Function(DayStat) f) => [for (final d in hs.days) (d.day, f(d))];
 
-        return RefreshIndicator(
-          onRefresh: () async { await hs.sync(); await _load(); },
-          child: ListView(padding: EdgeInsets.only(top: MediaQuery.of(ctx).padding.top + 8, bottom: 32), children: [
+        return ScrollStatusBarHost(
+          color: s.surface,
+          threshold: 0,
+          child: RefreshIndicator(
+            onRefresh: () async { await hs.sync(); await _load(); },
+            child: ListView(padding: EdgeInsets.only(top: MediaQuery.of(ctx).padding.top + 8, bottom: 32), children: [
             // ── profile header ──
             Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 8), child: InkWell(
               borderRadius: BorderRadius.circular(16),
@@ -118,11 +128,20 @@ class _DashboardPageState extends State<DashboardPage> {
             if (_night != null || _sleep.isNotEmpty) HealthCard(
               icon: Icons.bedtime_rounded, title: isFr ? 'Sommeil' : 'Sleep', color: violet,
               trailing: _night == null ? null : fmtDay(_night!.end),
-              onTap: _sleep.isEmpty ? null : () => _push(MetricPage(title: isFr ? 'Sommeil' : 'Sleep', unit: 'h', icon: Icons.bedtime_rounded, color: violet,
-                  series: [for (final e in _sleep) (e.$1, e.$2 * 60)], fmt: (v) => (v / 60).toStringAsFixed(1))),
+              onTap: _sleep.isEmpty ? null : () => _push(SleepDetailPage(nights: _sleep)),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 if (_night != null) ...[
                   BigValue(_hm(_night!.minutes), '', caption: isFr ? 'dernière nuit' : 'last night'),
+                  const SizedBox(height: 4),
+                  // Sleep quality summary
+                  Text(
+                    _night!.minutes >= 420 && _night!.minutes <= 540
+                        ? (isFr ? '✅ Bon sommeil' : '✅ Good sleep')
+                        : _night!.minutes >= 360
+                            ? (isFr ? '⚠️ Insuffisant' : '⚠️ Insufficient')
+                            : (isFr ? '❌ Trop court' : '❌ Too short'),
+                    style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600),
+                  ),
                   const SizedBox(height: 12),
                   SleepSpan(start: _night!.start, end: _night!.end, color: violet),
                 ],
@@ -178,7 +197,7 @@ class _DashboardPageState extends State<DashboardPage> {
               StatTile(icon: Icons.local_fire_department_rounded, value: '${week.fold(0.0, (a, w) => a + w.kcal).round()}', label: 'kcal'),
             ]),
           ]),
-        );
+        ));
       },
     );
   }
@@ -196,7 +215,13 @@ class _Line extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
-    return Material(color: s.surface.withValues(alpha: 0.55), borderRadius: BorderRadius.circular(18), clipBehavior: Clip.antiAlias,
+    return Material(
+      color: s.surfaceContainerHigh,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: s.outlineVariant.withValues(alpha: 0.5), width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         child: Row(children: [
           Icon(icon, size: 20, color: color), const SizedBox(width: 8),
@@ -213,7 +238,13 @@ class _MiniTile extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
-    return Material(color: Color.alphaBlend(color.withValues(alpha: 0.10), s.surfaceContainerLow), borderRadius: BorderRadius.circular(28), clipBehavior: Clip.antiAlias,
+    return Material(
+      color: Color.alphaBlend(color.withValues(alpha: 0.10), s.surfaceContainer),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(28),
+        side: BorderSide(color: s.outlineVariant.withValues(alpha: 0.55), width: 1),
+      ),
+      clipBehavior: Clip.antiAlias,
       child: InkWell(onTap: onTap, child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [Icon(icon, size: 18, color: color), const SizedBox(width: 6),
           Expanded(child: Text(title, style: t.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w800)))]),

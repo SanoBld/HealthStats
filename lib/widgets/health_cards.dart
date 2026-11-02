@@ -14,8 +14,12 @@ class HealthCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
-        color: Color.alphaBlend(color.withValues(alpha: 0.10), s.surfaceContainerLow),
-        borderRadius: BorderRadius.circular(28), clipBehavior: Clip.antiAlias,
+        color: Color.alphaBlend(color.withValues(alpha: 0.10), s.surfaceContainer),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+          side: BorderSide(color: s.outlineVariant.withValues(alpha: 0.55), width: 1),
+        ),
+        clipBehavior: Clip.antiAlias,
         child: InkWell(onTap: onTap, child: Padding(
           padding: const EdgeInsets.fromLTRB(18, 16, 14, 16),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

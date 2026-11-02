@@ -358,19 +358,51 @@ class _ScrubChartState extends State<ScrubChart> with SingleTickerProviderStateM
           ),
         );
       }),
-      if (_maxZoom > 1) AnimatedSize(duration: const Duration(milliseconds: 250), curve: Curves.easeOutCubic, child: Column(children: [
-        Row(children: [
-          const SizedBox(width: 8),
-          Text(_zoom > 1 ? '×${_zoom.toStringAsFixed(1)}' : (isFr ? 'Pincer pour zoomer' : 'Pinch to zoom'),
-              style: Theme.of(c).textTheme.labelMedium?.copyWith(color: s.onSurfaceVariant)),
-          const Spacer(),
-          IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.zoom_out_rounded), onPressed: _zoom > 1 ? () => _zoomBy(_zoom / 1.6, 0.5) : null),
-          IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.zoom_in_rounded), onPressed: _zoom < _maxZoom ? () => _zoomBy(_zoom * 1.6, 0.5) : null),
-          IconButton(visualDensity: VisualDensity.compact, icon: const Icon(Icons.restart_alt_rounded), onPressed: _zoom > 1 ? _reset : null),
-        ]),
-        if (_zoom > 1) Slider(value: _lo.clamp(0.0, 1 - 1 / _zoom).toDouble(), max: 1 - 1 / _zoom, onChanged: (v) => setState(() { _lo = v; _f = null; })),
-      ])),
+      if (widget.values.length > 2) Builder(builder: (_) {
+        final minVal = widget.values.reduce(math.min);
+        final maxVal = widget.values.reduce(math.max);
+        final avgVal = widget.values.reduce((a, b) => a + b) / widget.values.length;
+        String fmtV(double v) => widget.decimals > 0 ? v.toStringAsFixed(widget.decimals) : v.round().toString();
+        return Padding(
+          padding: const EdgeInsets.only(top: 8, left: _kPad, right: 8),
+          child: Row(children: [
+            _DataChip(label: isFr ? 'Min' : 'Min', value: '${fmtV(minVal)} ${widget.unit}', color: s.outline),
+            const SizedBox(width: 8),
+            _DataChip(label: isFr ? 'Moy.' : 'Avg', value: '${fmtV(avgVal)} ${widget.unit}', color: widget.color),
+            const SizedBox(width: 8),
+            _DataChip(label: isFr ? 'Max' : 'Max', value: '${fmtV(maxVal)} ${widget.unit}', color: s.tertiary),
+          ]),
+        );
+      }),
     ]);
+  }
+}
+
+class _DataChip extends StatelessWidget {
+  final String label, value;
+  final Color color;
+  const _DataChip({required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+        decoration: BoxDecoration(
+          color: s.surfaceContainerHigh.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: s.outlineVariant.withValues(alpha: 0.4), width: 1),
+        ),
+        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Text(label, style: t.labelSmall?.copyWith(color: s.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w600)),
+          const SizedBox(width: 5),
+          Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: t.labelSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: 11))),
+        ]),
+      ),
+    );
   }
 }
 

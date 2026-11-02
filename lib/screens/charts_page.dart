@@ -88,7 +88,7 @@ class _ChartsPageState extends State<ChartsPage> {
       }
       final share = per.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-      return SafeArea(child: ListView(padding: const EdgeInsets.only(bottom: 32), children: [
+      return SafeArea(child: Column(children: [
         M3PageHeader(showBack: false, title: L.navCharts),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: M3SegmentedButton<_Period>(
           segments: [
@@ -98,36 +98,40 @@ class _ChartsPageState extends State<ChartsPage> {
           ],
           selected: {_period}, onSelectionChanged: (v) => setState(() => _period = v.first),
         )),
-        SizedBox(height: 52, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(8), children: [
+        SizedBox(height: 50, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), children: [
           for (final m in _Metric.values) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
               child: M3Chip(label: Text(_label(m)), selected: _metric == m, onSelected: (_) => setState(() => _metric = m))),
         ])),
-        SizedBox(height: 48, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), children: [
+        SizedBox(height: 46, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4), children: [
           FilterChipButton(
-            label: _type == null ? (isFr ? 'Tous sports' : 'All sports') : sportName(sportOf(_type!)),
+            label: _type == null ? (isFr ? 'Tous les sports' : 'All sports') : sportName(sportOf(_type!)),
             active: _type != null,
             onTap: () async {
               final counts = <int, int>{};
               for (final w in hs.workouts) { counts[w.type] = (counts[w.type] ?? 0) + 1; }
               final sorted = counts.entries.toList()..sort((x, y) => y.value.compareTo(x.value));
-              final r = await pickFilter(ctx, title: 'Sport', allLabel: isFr ? 'Tous sports' : 'All sports',
+              final r = await pickFilter(ctx, title: isFr ? 'Sport' : 'Sport', allLabel: isFr ? 'Tous les sports' : 'All sports',
                   entries: [for (final e in sorted) FilterEntry('${e.key}', sportName(sportOf(e.key)), e.value, sportOf(e.key).icon)],
                   current: _type?.toString());
               if (r != null) setState(() => _type = r.isEmpty ? null : int.parse(r));
             },
           ),
         ])),
-        const SizedBox(height: 8),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TrendChart(key: ValueKey('$_period$_metric$_type'), monthly: series)),
-        const SizedBox(height: 16),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: WeekChart(data: byDay)),
-        if (share.isNotEmpty && _type == null) ...[
-          SectionTitle(isFr ? 'Répartition (30 j, durée)' : 'Share (30d, duration)'),
-          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ShareDonut(
-            items: share, getLabel: (e) => sportName(sportOf((e as MapEntry<int, int>).key)),
-            getPlays: (e) => (e as MapEntry<int, int>).value)),
-        ],
-        ..._trends(hs),
+        Divider(height: 1, thickness: 1, color: Theme.of(ctx).colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        Expanded(
+          child: ListView(padding: const EdgeInsets.only(top: 12, bottom: 32), children: [
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TrendChart(key: ValueKey('$_period$_metric$_type'), monthly: series)),
+            const SizedBox(height: 16),
+            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: WeekChart(data: byDay)),
+            if (share.isNotEmpty && _type == null) ...[
+              SectionTitle(isFr ? 'Répartition (30 j, durée)' : 'Share (30d, duration)'),
+              Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ShareDonut(
+                items: share, getLabel: (e) => sportName(sportOf((e as MapEntry<int, int>).key)),
+                getPlays: (e) => (e as MapEntry<int, int>).value)),
+            ],
+            ..._trends(hs),
+          ]),
+        ),
       ]));
     });
   }

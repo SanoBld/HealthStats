@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../app_state.dart';
 import '../l10n/l10n.dart';
 import '../widgets/hs_widgets.dart' show isFr;
+import '../widgets/scroll_status_bar.dart';
 import '../theme/m3_motion.dart';
 import 'activities_page.dart';
 import 'charts_page.dart';
@@ -43,7 +44,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       const ActivitiesPage(), const MapPage(), const SearchPage(), const ChartsPage(),
     ].map((p) => ClipRect(child: ColoredBox(color: bg, child: p))).toList();
     return Scaffold(
-      body: M3FadeThroughStack(index: _idx, children: pages),
+      body: ScrollStatusBarHost(
+        color: bg,
+        resetToken: _idx,
+        threshold: 0,
+        child: M3FadeThroughStack(index: _idx, children: pages),
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _idx,
         onDestinationSelected: (i) {

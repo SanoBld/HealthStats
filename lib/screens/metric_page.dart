@@ -55,23 +55,30 @@ class _MetricPageState extends State<MetricPage> {
         isFr ? '30 derniers jours' : 'Last 30 days', isFr ? '12 derniers mois' : 'Last 12 months'][_m];
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
-      body: ListView(padding: const EdgeInsets.fromLTRB(16, 4, 16, 32), children: [
-        M3SegmentedButton<int>(
-          segments: [for (final (i, l) in [isFr ? 'Jour' : 'Day', isFr ? 'Semaine' : 'Week', isFr ? 'Mois' : 'Month', isFr ? 'Année' : 'Year'].indexed)
-            ButtonSegment(value: i, label: Text(l))],
-          selected: {_m}, onSelectionChanged: (v) => setState(() => _m = v.first)),
-        const SizedBox(height: 18),
-        Row(children: [
-          Icon(widget.icon, color: widget.color), const SizedBox(width: 8),
-          Text(cap, style: t.labelLarge?.copyWith(color: s.onSurfaceVariant)),
-        ]),
-        const SizedBox(height: 4),
-        BigValue(widget.fmt(head), widget.unit, caption: _m == 0 || vals.isEmpty ? null
-            : widget.average ? (isFr ? 'moyenne' : 'average')
-            : '${isFr ? 'moyenne' : 'average'} ${widget.fmt(avg)} ${widget.unit}${_m == 3 ? (isFr ? ' / mois' : ' / month') : (isFr ? ' / jour' : ' / day')}'),
-        const SizedBox(height: 14),
-        if (data.length >= 2) TrendChart(monthly: data, showStats: false)
-        else Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(isFr ? 'Pas assez de données' : 'Not enough data'))),
+      body: Column(children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+          child: M3SegmentedButton<int>(
+            segments: [for (final (i, l) in [isFr ? 'Jour' : 'Day', isFr ? 'Semaine' : 'Week', isFr ? 'Mois' : 'Month', isFr ? 'Année' : 'Year'].indexed)
+              ButtonSegment(value: i, label: Text(l))],
+            selected: {_m}, onSelectionChanged: (v) => setState(() => _m = v.first)),
+        ),
+        Divider(height: 1, thickness: 1, color: s.outlineVariant.withValues(alpha: 0.3)),
+        Expanded(
+          child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
+            Row(children: [
+              Icon(widget.icon, color: widget.color), const SizedBox(width: 8),
+              Text(cap, style: t.labelLarge?.copyWith(color: s.onSurfaceVariant)),
+            ]),
+            const SizedBox(height: 4),
+            BigValue(widget.fmt(head), widget.unit, caption: _m == 0 || vals.isEmpty ? null
+                : widget.average ? (isFr ? 'moyenne' : 'average')
+                : '${isFr ? 'moyenne' : 'average'} ${widget.fmt(avg)} ${widget.unit}${_m == 3 ? (isFr ? ' / mois' : ' / month') : (isFr ? ' / jour' : ' / day')}'),
+            const SizedBox(height: 14),
+            if (data.length >= 2) TrendChart(monthly: data, showStats: false)
+            else Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(isFr ? 'Pas assez de données' : 'Not enough data'))),
+          ]),
+        ),
       ]),
     );
   }

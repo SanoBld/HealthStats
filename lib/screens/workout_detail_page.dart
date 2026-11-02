@@ -7,22 +7,19 @@ import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
 
-/// Map tiles: CARTO light / dark basemaps (OpenStreetMap data, no API key).
+/// Map tiles: OpenStreetMap standard tiles (100% free, no API key required).
 Widget hsTileLayer(BuildContext c) {
-  final dark = Theme.of(c).brightness == Brightness.dark;
   return TileLayer(
-    urlTemplate: 'https://{s}.basemaps.cartocdn.com/${dark ? 'dark_all' : 'rastertiles/voyager'}/{z}/{x}/{y}{r}.png',
-    subdomains: const ['a', 'b', 'c', 'd'],
-    retinaMode: RetinaMode.isHighDensity(c),
-    maxNativeZoom: 20,
+    urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     userAgentPackageName: 'com.healthstats.app',
+    maxNativeZoom: 19,
   );
 }
 
-/// Small credit, without the flutter_map logo text.
+/// Attribution for OpenStreetMap data.
 Widget hsAttribution() => const RichAttributionWidget(
   showFlutterMapAttribution: false,
-  attributions: [TextSourceAttribution('© OpenStreetMap, © CARTO')],
+  attributions: [TextSourceAttribution('© OpenStreetMap contributors')],
 );
 
 class WorkoutDetailPage extends StatefulWidget {

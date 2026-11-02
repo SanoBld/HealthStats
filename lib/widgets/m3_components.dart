@@ -44,6 +44,7 @@ class M3ShapeMorph extends StatelessWidget {
     this.padding,
     this.height,
     this.colorDuration,
+    this.side,
   });
 
   final Duration? colorDuration;
@@ -52,6 +53,7 @@ class M3ShapeMorph extends StatelessWidget {
   final Widget?      child;
   final EdgeInsetsGeometry? padding;
   final double?      height;
+  final BorderSide?  side;
 
   @override
   Widget build(BuildContext context) {
@@ -71,7 +73,8 @@ class M3ShapeMorph extends StatelessWidget {
           decoration: ShapeDecoration(
             color: c,
             shape: RoundedRectangleBorder(
-                borderRadius: _clampRadius(r ?? radius)),
+                borderRadius: _clampRadius(r ?? radius),
+                side: side ?? BorderSide.none),
           ),
           child: child,
         ),
@@ -225,6 +228,7 @@ class _M3PressCardState extends State<M3PressCard> {
       child: M3ShapeMorph(
         radius: r,
         color: widget.color,
+        side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant.withValues(alpha: 0.5), width: 1),
         child: Material(
           type: MaterialType.transparency,
           child: M3InkWell(

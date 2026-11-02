@@ -52,6 +52,10 @@ class HealthStatsApp extends StatelessWidget {
           ColorScheme ds = (dyn && darkDyn != null)
               ? darkDyn.harmonized()
               : ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
+          if (dyn) {
+            ls = ls.copyWith(outlineVariant: ls.outlineVariant.withValues(alpha: 0.7));
+            ds = ds.copyWith(outlineVariant: ds.outlineVariant.withValues(alpha: 0.7));
+          }
           if (oledModeNotifier.value) {
             ds = ds.copyWith(surface: Colors.black, surfaceContainerLowest: Colors.black,
                 surfaceContainerLow: const Color(0xFF080808), surfaceContainer: const Color(0xFF0D0D0D));

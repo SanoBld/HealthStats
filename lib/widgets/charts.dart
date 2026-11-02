@@ -83,33 +83,8 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
     final bg = _cardBg(s, s.primaryContainer);
     return Container(
       decoration: _chartCardDecoration(s, s.primaryContainer),
-      padding: const EdgeInsets.fromLTRB(16, 18, 16, 14),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        if (widget.showStats) Wrap(spacing: 8, runSpacing: 8, children: [
-          _ChipStat(label: tx('ui_total'), value: _fmt(total), s: s, t: t,
-              bg: s.primaryContainer, fg: s.onPrimaryContainer),
-          _ChipStat(label: tx('ui_avg_mo'), value: _fmt(avg), s: s, t: t,
-              bg: s.secondaryContainer, fg: s.onSecondaryContainer),
-          if (raw.isNotEmpty)
-            _ChipStat(label: tx('cx_best_month'), value: labels[bestI], s: s, t: t,
-                bg: s.tertiaryContainer, fg: s.onTertiaryContainer),
-        ]),
-        if (widget.showStats) const SizedBox(height: 14),
-        Row(children: [
-          const Spacer(),
-          if (raw.length > 3) ...[
-            IconButton.filledTonal(
-              icon: const Icon(Icons.zoom_out_rounded),
-              onPressed: _zoom > 1 ? () => _zoomTo(raw.length, _zoom / 1.6, 0.5) : null,
-            ),
-            IconButton.filledTonal(
-              icon: const Icon(Icons.zoom_in_rounded),
-              onPressed: _zoom < _maxZoom(raw.length)
-                  ? () => _zoomTo(raw.length, _zoom * 1.6, 0.5) : null,
-            ),
-          ],
-        ]),
-        const SizedBox(height: 8),
         SizedBox(
           height: 230,
           child: LayoutBuilder(builder: (ctx, c) {
@@ -171,6 +146,33 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
             );
           }),
         ),
+        if (widget.showStats && raw.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          Row(children: [
+            Expanded(child: _CleanStatBadge(
+              icon: Icons.functions_rounded,
+              label: tx('ui_total'),
+              value: _fmt(total),
+              color: s.primary,
+            )),
+            const SizedBox(width: 8),
+            Expanded(child: _CleanStatBadge(
+              icon: Icons.equalizer_rounded,
+              label: tx('ui_avg_mo'),
+              value: _fmt(avg),
+              color: s.secondary,
+            )),
+            if (raw.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Expanded(child: _CleanStatBadge(
+                icon: Icons.emoji_events_rounded,
+                label: labels[bestI],
+                value: _fmt(raw[bestI].round()),
+                color: s.tertiary,
+              )),
+            ],
+          ]),
+        ],
       ]),
     );
   }
@@ -538,13 +540,50 @@ BoxDecoration _chartCardDecoration(ColorScheme s, [Color? tint]) => _chartExport
     : BoxDecoration(
   color: _cardBg(s, tint),
   borderRadius: BorderRadius.circular(28),
+  border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5), width: 1),
 );
 
 Color _cardBg(ColorScheme s, [Color? tint]) => (_chartExportMode && _exportBgColor != null)
     ? _exportBgColor!
     : tint == null
-    ? s.surfaceContainerLow
-    : Color.alphaBlend(tint.withValues(alpha: 0.32), s.surfaceContainerLow);
+    ? s.surfaceContainer
+    : Color.alphaBlend(tint.withValues(alpha: 0.14), s.surfaceContainer);
+
+class _CleanStatBadge extends StatelessWidget {
+  final IconData icon;
+  final String label, value;
+  final Color color;
+  const _CleanStatBadge({required this.icon, required this.label, required this.value, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme;
+    final t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: s.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: s.outlineVariant.withValues(alpha: 0.4), width: 1),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 4),
+            Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+                style: t.labelSmall?.copyWith(color: s.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w600))),
+          ]),
+          const SizedBox(height: 2),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
 
 void _paintText(Canvas c, String text, Offset o,
     {required Color color, double size = 10, FontWeight weight = FontWeight.w600, int align = 1}) {
