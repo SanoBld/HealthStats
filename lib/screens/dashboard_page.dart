@@ -37,7 +37,7 @@ class _DashboardPageState extends State<DashboardPage> {
     final hs = HealthService.instance;
     if (!hs.permitted) return;
     _loadedFor = hs.lastSync?.millisecondsSinceEpoch ?? 0;
-    final f = [hs.sleepNights(), hs.metric('restingHr', days: 60), hs.metric('hrv', days: 60), hs.metric('spo2', days: 60), hs.weights()];
+    final f = [hs.sleepNights(), hs.metric('restingHr'), hs.metric('hrv'), hs.metric('spo2'), hs.weights()];
     final night = hs.lastSleep();
     final r = await Future.wait(f);
     final n = await night;

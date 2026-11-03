@@ -20,6 +20,7 @@ class MetricPage extends StatefulWidget {
 
 class _MetricPageState extends State<MetricPage> {
   int _m = 1; // 0 day, 1 week, 2 month, 3 year
+  DateTime? _day; // chosen day (day mode)
   static DateTime _d(DateTime x) => DateTime(x.year, x.month, x.day);
   static String _k(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -29,7 +30,7 @@ class _MetricPageState extends State<MetricPage> {
   }
 
   Map<String, int> _chart() {
-    final now = _d(DateTime.now());
+    final now = _m == 0 ? (_day ?? _d(DateTime.now())) : _d(DateTime.now());
     final byDay = {for (final e in widget.series) _k(_d(e.$1)): e.$2};
     final out = <String, int>{};
     if (_m == 3) {
@@ -54,11 +55,15 @@ class _MetricPageState extends State<MetricPage> {
     final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
     final data = _chart();
     final vals = data.values.where((v) => !widget.average || v > 0).toList();
-    final today = widget.series.where((e) => _d(e.$1) == _d(DateTime.now())).fold<double>(0, (a, e) => a + e.$2);
+    final selDay = _day ?? _d(DateTime.now());
+    final isToday = selDay == _d(DateTime.now());
+    final today = widget.series.where((e) => _d(e.$1) == selDay).fold<double>(0, (a, e) => a + e.$2);
+    final first = widget.series.isEmpty ? selDay : _d(widget.series.map((e) => e.$1).reduce((a, b) => a.isBefore(b) ? a : b));
+    String dmy(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
     final total = vals.fold<int>(0, (a, b) => a + b);
     final avg = vals.isEmpty ? 0.0 : total / vals.length;
     final head = _m == 0 ? today : widget.average ? avg : total.toDouble();
-    final cap = [isFr ? 'Aujourd\'hui' : 'Today', isFr ? '7 derniers jours' : 'Last 7 days',
+    final cap = [isToday ? (isFr ? 'Aujourd\'hui' : 'Today') : dmy(selDay), isFr ? '7 derniers jours' : 'Last 7 days',
         isFr ? '30 derniers jours' : 'Last 30 days', isFr ? '12 derniers mois' : 'Last 12 months'][_m];
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
@@ -73,6 +78,24 @@ class _MetricPageState extends State<MetricPage> {
         Divider(height: 1, thickness: 1, color: s.outlineVariant.withValues(alpha: 0.3)),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
+            if (_m == 0) Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(children: [
+                IconButton(onPressed: selDay.isAfter(first) ? () => setState(() => _day = selDay.subtract(const Duration(days: 1))) : null,
+                    icon: const Icon(Icons.chevron_left_rounded)),
+                Expanded(child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    final d = await showDatePicker(context: context, initialDate: selDay, firstDate: first, lastDate: _d(DateTime.now()));
+                    if (d != null) setState(() => _day = _d(d));
+                  },
+                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Center(child: Text(dmy(selDay), style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)))),
+                )),
+                IconButton(onPressed: isToday ? null : () => setState(() => _day = selDay.add(const Duration(days: 1))),
+                    icon: const Icon(Icons.chevron_right_rounded)),
+              ]),
+            ),
             Row(children: [
               Icon(widget.icon, color: widget.color), const SizedBox(width: 8),
               Text(cap, style: t.labelLarge?.copyWith(color: s.onSurfaceVariant)),
@@ -97,8 +120,11 @@ class _MetricPageState extends State<MetricPage> {
             if (vals.isNotEmpty) ...[
               const SizedBox(height: 12),
               Row(children: [
-                Expanded(child: StatBadge(icon: Icons.trending_down_rounded, label: 'Min', color: s.outline,
-                    value: '${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} ${widget.unit}')),
+                Expanded(child: widget.average
+                    ? StatBadge(icon: Icons.trending_down_rounded, label: 'Min', color: s.outline,
+                        value: '${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} ${widget.unit}')
+                    : StatBadge(icon: Icons.functions_rounded, label: 'Total', color: s.outline,
+                        value: '${widget.fmt(total.toDouble())} ${widget.unit}')),
                 const SizedBox(width: 8),
                 Expanded(child: StatBadge(icon: Icons.equalizer_rounded, label: isFr ? 'Moy.' : 'Avg', color: widget.color,
                     value: '${widget.fmt(avg)} ${widget.unit}')),

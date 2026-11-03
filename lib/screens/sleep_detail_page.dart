@@ -18,6 +18,7 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
   int _m = 1; // 0 = night, 1 = week, 2 = month
   List<_SleepNight> _details = [];
   bool _loaded = false;
+  DateTime? _day; // chosen wake-up day (null = latest)
 
   @override
   void initState() {
@@ -104,11 +105,15 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
     _p = s.primary;
     final violet = sportColorsNotifier.value ? const Color(0xFF7C5CFF) : s.primary;
     final nights = widget.nights;
-    final avg7 = nights.length >= 7
-        ? nights.reversed.take(7).fold(0.0, (a, e) => a + e.$2) / 7
-        : nights.isEmpty ? 0.0 : nights.fold(0.0, (a, e) => a + e.$2) / nights.length;
-    final last = nights.isEmpty ? null : nights.last;
-    final lastNight = _details.isNotEmpty ? _details.first : null;
+    bool same(DateTime a, DateTime b) => a.year == b.year && a.month == b.month && a.day == b.day;
+    final selDay = nights.isEmpty ? null : (_day ?? nights.last.$1);
+    final selI = selDay == null ? -1 : nights.indexWhere((e) => same(e.$1, selDay));
+    final selHours = selI < 0 ? 0.0 : nights[selI].$2;
+    final lastNight = selDay == null ? null : _details.where((d) => same(d.end, selDay)).firstOrNull;
+    final winDays = _m == 1 ? 7 : 30;
+    final win = [for (final e in nights) if (DateTime.now().difference(e.$1).inDays < winDays) e];
+    final avgW = win.isEmpty ? 0.0 : win.fold(0.0, (a, e) => a + e.$2) / win.length;
+    String dmy(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
     // Build chart data
     final now = DateTime.now();
@@ -154,6 +159,30 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
         Divider(height: 1, thickness: 1, color: s.outlineVariant.withValues(alpha: 0.3)),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
+            // ── Day navigator (night mode) ──
+            if (_m == 0 && selI >= 0) Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(children: [
+                IconButton(
+                  onPressed: selI > 0 ? () => setState(() => _day = nights[selI - 1].$1) : null,
+                  icon: const Icon(Icons.chevron_left_rounded)),
+                Expanded(child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () async {
+                    final d = await showDatePicker(
+                      context: context, initialDate: nights[selI].$1,
+                      firstDate: nights.first.$1, lastDate: nights.last.$1,
+                      selectableDayPredicate: (x) => nights.any((e) => same(e.$1, x)));
+                    if (d != null) setState(() => _day = d);
+                  },
+                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
+                    child: Center(child: Text(dmy(nights[selI].$1), style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)))),
+                )),
+                IconButton(
+                  onPressed: selI < nights.length - 1 ? () => setState(() => _day = nights[selI + 1].$1) : null,
+                  icon: const Icon(Icons.chevron_right_rounded)),
+              ]),
+            ),
             // ── Summary card ──
             Container(
               padding: const EdgeInsets.all(18),
@@ -168,7 +197,7 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
               const SizedBox(width: 8),
               Text(
                 _m == 0
-                    ? (isFr ? 'Dernière nuit' : 'Last night')
+                    ? (selDay == null || same(selDay, nights.last.$1) ? (isFr ? 'Dernière nuit' : 'Last night') : dmy(selDay))
                     : _m == 1
                         ? (isFr ? 'Moyenne 7 jours' : '7-day average')
                         : (isFr ? 'Moyenne 30 jours' : '30-day average'),
@@ -177,17 +206,17 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
             ]),
             const SizedBox(height: 12),
             BigValue(
-              _m == 0 ? _hm(last?.$2 ?? 0) : _hm(avg7),
+              _m == 0 ? _hm(selHours) : _hm(avgW),
               '',
             ),
             const SizedBox(height: 8),
             Text(
-              _sleepQuality(_m == 0 ? (last?.$2 ?? 0) : avg7),
+              _sleepQuality(_m == 0 ? selHours : avgW),
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 4),
             Text(
-              _sleepAdvice(_m == 0 ? (last?.$2 ?? 0) : avg7),
+              _sleepAdvice(_m == 0 ? selHours : avgW),
               style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
             ),
           ]),
@@ -195,10 +224,12 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
         const SizedBox(height: 16),
 
         // ── Sleep stages (last night) ──
-        if (_m == 0 && lastNight != null && lastNight.stages.isNotEmpty) ...[
+        if (_m == 0 && lastNight != null) ...[
           _ScoreCard(night: lastNight, all: _details, color: violet),
+          if (lastNight.stages.any((e) => e.type != 0)) ...[
           const SizedBox(height: 16),
           _SleepStagesChart(night: lastNight, stageColor: _stageColor, stageName: _stageName, accent: violet),
+          ],
         ],
 
         // ── Week / Month bars with 7 h target ──
@@ -207,8 +238,8 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
           _SleepBarsChart(data: chartData(), color: violet, targetMin: 420),
         ],
 
-        // ── Statistics ──
-        if (nights.length > 1) ...[
+        // ── Statistics (week / month only, on that period) ──
+        if (_m > 0 && win.length > 1) ...[
           const SizedBox(height: 20),
           Container(
             padding: const EdgeInsets.all(16),
@@ -224,47 +255,37 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
               _StatRow(
                 icon: Icons.trending_up_rounded,
                 label: isFr ? 'Nuit la plus longue' : 'Longest night',
-                value: _hm(nights.map((e) => e.$2).reduce(math.max)),
+                value: _hm(win.map((e) => e.$2).reduce(math.max)),
                 color: violet,
               ),
               _StatRow(
                 icon: Icons.trending_down_rounded,
                 label: isFr ? 'Nuit la plus courte' : 'Shortest night',
-                value: _hm(nights.map((e) => e.$2).reduce(math.min)),
+                value: _hm(win.map((e) => e.$2).reduce(math.min)),
                 color: violet,
               ),
               _StatRow(
                 icon: Icons.equalizer_rounded,
                 label: isFr ? 'Moyenne' : 'Average',
-                value: _hm(nights.fold(0.0, (a, e) => a + e.$2) / nights.length),
+                value: _hm(win.fold(0.0, (a, e) => a + e.$2) / win.length),
+                color: violet,
+              ),
+              _StatRow(
+                icon: Icons.functions_rounded,
+                label: isFr ? 'Total de la période' : 'Period total',
+                value: '${win.fold(0.0, (a, e) => a + e.$2).round()} h',
                 color: violet,
               ),
               _StatRow(
                 icon: Icons.nights_stay_rounded,
                 label: isFr ? 'Nuits enregistrées' : 'Recorded nights',
-                value: '${nights.length}',
+                value: '${win.length}',
                 color: violet,
               ),
             ]),
           ),
         ],
 
-        // ── Trend chart (last 30 nights) ──
-        if (_m == 0 && nights.length > 3) ...[
-          const SizedBox(height: 20),
-          Text((isFr ? 'Tendance' : 'Trend').toUpperCase(),
-              style: t.labelMedium?.copyWith(
-                  letterSpacing: 1.2,
-                  color: s.onSurfaceVariant,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          Builder(builder: (_) {
-            final l = nights.reversed.take(30).toList().reversed.toList();
-            return ScrubChart(
-              values: [for (final e in l) e.$2], color: violet, unit: 'h', decimals: 1,
-              labelOf: (i) => '${l[i].$1.day.toString().padLeft(2, '0')}/${l[i].$1.month.toString().padLeft(2, '0')}');
-          }),
-        ],
       ])),
     ]));
   }
@@ -286,31 +307,39 @@ class _SleepNight {
 
 // ── Extension on HealthService for sleep sessions ──
 extension _SleepSessions on HealthService {
+  /// One entry per night (newest first), whole history, with the real stages.
   Future<List<_SleepNight>> sleepSessions() async {
     try {
-      final raw = await sleepNights();
-      if (raw.isEmpty) return [];
-      // Group sessions into nights and build stage breakdown from total sleep time
-      // Since Health Connect may not provide stage data through our current channel,
-      // we estimate stages from total sleep time using typical proportions:
-      // Deep: ~20%, Light: ~50%, REM: ~25%, Awake: ~5%
-      return [
-        for (final n in raw.reversed.take(30))
-          _SleepNight(
-            n.$1.subtract(Duration(hours: n.$2.round())),
-            n.$1,
-            [
-              _SleepStage(3, (n.$2 * 60 * 0.20).round()), // deep
-              _SleepStage(2, (n.$2 * 60 * 0.50).round()), // light
-              _SleepStage(4, (n.$2 * 60 * 0.25).round()), // REM
-              _SleepStage(1, (n.$2 * 60 * 0.05).round()), // awake
-            ],
-          ),
-      ];
+      final byDay = <DateTime, List<Map>>{};
+      for (final m in await sleepRaw()) {
+        final b = DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt());
+        (byDay[DateTime(b.year, b.month, b.day)] ??= []).add(m);
+      }
+      final days = byDay.keys.toList()..sort((a, b) => b.compareTo(a));
+      return [for (final d in days) _buildNight(byDay[d]!)];
     } catch (_) {
       return [];
     }
   }
+}
+
+_SleepNight _buildNight(List<Map> ss) {
+  DateTime t(Object? v) => DateTime.fromMillisecondsSinceEpoch((v as num).toInt());
+  final start = ss.map((m) => t(m['start'])).reduce((a, b) => a.isBefore(b) ? a : b);
+  final end = ss.map((m) => t(m['end'])).reduce((a, b) => a.isAfter(b) ? a : b);
+  final st = <(int, int, int)>[];
+  for (final m in ss) {
+    for (final e in (m['stages'] as List? ?? const [])) {
+      final l = (e as List).cast<num>();
+      if (l[0] > 0) st.add((l[0].toInt(), l[1].toInt(), l[2].toInt()));
+    }
+  }
+  st.sort((a, b) => a.$2.compareTo(b.$2));
+  // no stage data from the source: one plain block (nothing is guessed)
+  final stages = st.isEmpty
+      ? [_SleepStage(0, end.difference(start).inMinutes)]
+      : [for (final e in st) _SleepStage(e.$1, ((e.$3 - e.$2) / 60000).round())];
+  return _SleepNight(start, end, stages);
 }
 
 // ── Card helper (same card as the charts) ──
@@ -336,6 +365,7 @@ class _ScoreCard extends StatelessWidget {
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
     final dur = (night.totalMinutes / 480 * 50).clamp(0, 50).toDouble();
+    final hasSt = night.stages.any((e) => e.type != 0);
     final awake = night.stages.where((e) => e.type == 1).length;
     final inter = (20 - awake * 4).clamp(0, 20).toDouble();
     final others = all.where((e) => e.start != night.start).toList();
@@ -345,7 +375,8 @@ class _ScoreCard extends StatelessWidget {
       diff = _tod(night.start) - avg;
     }
     final bed = diff == null ? 30.0 : (30 - diff.abs() / 2).clamp(0, 30).toDouble();
-    final score = (dur + bed + inter).round();
+    final scale = hasSt ? 100.0 : 80.0; // no stages = no interruptions part
+    final score = ((dur + bed + (hasSt ? inter : 0)) / scale * 100).round();
     final label = score >= 80 ? (isFr ? 'Élevé' : 'High') : score >= 60 ? (isFr ? 'Moyen' : 'Medium') : (isFr ? 'Faible' : 'Low');
     final sentence = diff == null
         ? (isFr ? 'Ton score est calculé sur la durée et les interruptions.' : 'Your score is based on duration and interruptions.')
@@ -378,13 +409,13 @@ class _ScoreCard extends StatelessWidget {
             const SizedBox(height: 6),
             row(color, isFr ? 'Durée' : 'Duration', dur, 50),
             row(color.withValues(alpha: 0.65), isFr ? 'Heure de coucher' : 'Bedtime', bed, 30),
-            row(color.withValues(alpha: 0.35), isFr ? 'Interruptions' : 'Interruptions', inter, 20),
+            if (hasSt) row(color.withValues(alpha: 0.35), 'Interruptions', inter, 20),
           ])),
           const SizedBox(width: 12),
           SizedBox(width: 96, height: 96, child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 900), curve: Curves.easeOutCubic,
             builder: (_, p, _) => CustomPaint(
-              painter: _RingPainter([dur / 100, bed / 100, inter / 100], [color, color.withValues(alpha: 0.65), color.withValues(alpha: 0.35)],
+              painter: _RingPainter([dur / scale, bed / scale, hasSt ? inter / scale : 0.0], [color, color.withValues(alpha: 0.65), color.withValues(alpha: 0.35)],
                   s.surfaceContainerHighest, p),
               child: Center(child: Text('$score', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
             ),

@@ -149,7 +149,7 @@ class HealthService extends ChangeNotifier {
 
       // 3) daily totals (optional)
       try {
-        final ds = await _list('daily', {'start': DateTime.now().subtract(const Duration(days: 730)).millisecondsSinceEpoch, 'end': end},
+        final ds = await _list('daily', {'start': DateTime.now().subtract(const Duration(days: 3650)).millisecondsSinceEpoch, 'end': end},
             const Duration(minutes: 2));
         days = ds.map((e) => DayStat.fromMap(Map.from(e as Map))).toList()
           ..sort((x, y) => x.day.compareTo(y.day));
@@ -300,7 +300,7 @@ class HealthService extends ChangeNotifier {
   }
 
   /// Values of a metric over [days]: restingHr, hrv, spo2, vo2, resp, bodyFat, systolic, temp.
-  Future<List<(DateTime, double)>> metric(String kind, {int days = 180}) async {
+  Future<List<(DateTime, double)>> metric(String kind, {int days = 3650}) async {
     try {
       final r = (await _ch.invokeMethod<List>('metric', {'kind': kind,
               'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
@@ -314,12 +314,20 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return []; }
   }
 
-  /// Hours slept per night (last 90 days), by wake-up day.
-  Future<List<(DateTime, double)>> sleepNights() async {
+  /// All sleep sessions of the whole history (with real stages when the source gives them).
+  Future<List<Map>> sleepRaw() async {
     try {
       final r = (await _ch.invokeMethod<List>('sleep', {
-            'start': DateTime.now().subtract(const Duration(days: 90)).millisecondsSinceEpoch,
-            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
+            'start': DateTime.now().subtract(const Duration(days: 3650)).millisecondsSinceEpoch,
+            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 60))) ?? [];
+      return [for (final e in r) Map.from(e as Map)];
+    } catch (_) { return []; }
+  }
+
+  /// Hours slept per night (whole history), by wake-up day.
+  Future<List<(DateTime, double)>> sleepNights() async {
+    try {
+      final r = await sleepRaw();
       final per = <DateTime, double>{};
       for (final e in r) {
         final m = e as Map;
@@ -354,7 +362,7 @@ class HealthService extends ChangeNotifier {
   Future<List<(DateTime, double)>> weights() async {
     try {
       final r = (await _ch.invokeMethod<List>('weight', {
-            'start': DateTime.now().subtract(const Duration(days: 730)).millisecondsSinceEpoch,
+            'start': DateTime.now().subtract(const Duration(days: 3650)).millisecondsSinceEpoch,
             'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
       return r.map((e) { final l = (e as List).cast<num>();
         return (DateTime.fromMillisecondsSinceEpoch(l[0].toInt()), l[1].toDouble()); }).toList()

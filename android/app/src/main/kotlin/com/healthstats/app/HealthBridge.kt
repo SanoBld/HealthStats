@@ -333,15 +333,42 @@ class HealthBridge(private val ctx: Context) {
         return out.sortedBy { it[0] }
     }
 
+    /** All sleep sessions (paged), with the real stages when the source gives them: [type, startMs, endMs]. */
     suspend fun sleep(startMs: Long, endMs: Long): List<Map<String, Any?>> {
-        val res = client.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range(startMs, endMs), pageSize = 500))
-        return res.records.map {
-            mapOf("start" to it.startTime.toEpochMilli(), "end" to it.endTime.toEpochMilli(), "title" to it.title)
-        }
+        val out = ArrayList<Map<String, Any?>>()
+        val from = clampStart(startMs)
+        var token: String? = null
+        do {
+            val res = client.readRecords(ReadRecordsRequest(SleepSessionRecord::class, range(from, endMs), pageSize = 500, pageToken = token))
+            res.records.forEach {
+                out.add(mapOf(
+                    "start" to it.startTime.toEpochMilli(), "end" to it.endTime.toEpochMilli(), "title" to it.title,
+                    "stages" to it.stages.map { st ->
+                        // 1 awake, 2 light, 3 deep, 4 REM, 0 ignored
+                        val t = when (st.stage) {
+                            SleepSessionRecord.STAGE_TYPE_AWAKE, SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED -> 1L
+                            SleepSessionRecord.STAGE_TYPE_LIGHT, SleepSessionRecord.STAGE_TYPE_SLEEPING -> 2L
+                            SleepSessionRecord.STAGE_TYPE_DEEP -> 3L
+                            SleepSessionRecord.STAGE_TYPE_REM -> 4L
+                            else -> 0L
+                        }
+                        listOf(t, st.startTime.toEpochMilli(), st.endTime.toEpochMilli())
+                    }))
+            }
+            token = res.pageToken
+        } while (!token.isNullOrEmpty())
+        return out
     }
 
     suspend fun weight(startMs: Long, endMs: Long): List<List<Double>> {
-        val res = client.readRecords(ReadRecordsRequest(WeightRecord::class, range(startMs, endMs), pageSize = 500))
-        return res.records.map { listOf(it.time.toEpochMilli().toDouble(), it.weight.inKilograms) }
+        val out = ArrayList<List<Double>>()
+        val from = clampStart(startMs)
+        var token: String? = null
+        do {
+            val res = client.readRecords(ReadRecordsRequest(WeightRecord::class, range(from, endMs), pageSize = 500, pageToken = token))
+            res.records.forEach { out.add(listOf(it.time.toEpochMilli().toDouble(), it.weight.inKilograms)) }
+            token = res.pageToken
+        } while (!token.isNullOrEmpty())
+        return out
     }
 }
