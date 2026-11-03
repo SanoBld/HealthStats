@@ -10,9 +10,10 @@ class MetricPage extends StatefulWidget {
   final List<(DateTime, double)> series; // one value per day
   final bool average;                    // true = averaged (heart rate), false = summed
   final String Function(double) fmt;
+  final String? desc; // what this metric is
   final String Function(double avg, bool isFr)? verdict; // short sentence: good or not
   const MetricPage({super.key, required this.title, required this.unit, required this.icon, required this.color,
-      required this.series, required this.fmt, this.average = false, this.verdict});
+      required this.series, required this.fmt, this.average = false, this.verdict, this.desc});
   @override
   State<MetricPage> createState() => _MetricPageState();
 }
@@ -21,6 +22,11 @@ class _MetricPageState extends State<MetricPage> {
   int _m = 1; // 0 day, 1 week, 2 month, 3 year
   static DateTime _d(DateTime x) => DateTime(x.year, x.month, x.day);
   static String _k(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  double _recent() {
+    final l = widget.series.reversed.take(7).toList();
+    return l.isEmpty ? 0 : l.fold<double>(0, (a, e) => a + e.$2) / l.length;
+  }
 
   Map<String, int> _chart() {
     final now = _d(DateTime.now());
@@ -78,6 +84,10 @@ class _MetricPageState extends State<MetricPage> {
             const SizedBox(height: 14),
             if (data.length >= 2) TrendChart(monthly: data, showStats: false, color: widget.color)
             else Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(isFr ? 'Pas assez de données' : 'Not enough data'))),
+            if (widget.desc != null) ...[
+              const SizedBox(height: 16),
+              Text(widget.desc!, style: t.bodyMedium?.copyWith(color: s.onSurfaceVariant, height: 1.35)),
+            ],
             if (widget.average && vals.isNotEmpty) ...[
               const SizedBox(height: 16),
               Container(
@@ -99,8 +109,9 @@ class _MetricPageState extends State<MetricPage> {
                   ])),
                 ]),
               ),
-              if (widget.verdict != null) ...[
-                const SizedBox(height: 12),
+            ],
+            if (widget.verdict != null && vals.isNotEmpty) ...[
+              const SizedBox(height: 16),
                 Container(
                   width: double.infinity,
                   padding: const EdgeInsets.all(16),
@@ -108,9 +119,8 @@ class _MetricPageState extends State<MetricPage> {
                     color: widget.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(24),
                   ),
-                  child: Text(widget.verdict!(avg, isFr), style: t.bodyMedium?.copyWith(height: 1.35)),
+                  child: Text(widget.verdict!(widget.average ? avg : _recent(), isFr), style: t.bodyMedium?.copyWith(height: 1.35)),
                 ),
-              ],
             ],
           ]),
         ),

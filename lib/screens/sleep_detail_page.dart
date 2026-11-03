@@ -46,13 +46,22 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
     return '$h h ${m.toString().padLeft(2, '0')}';
   }
 
-  Color _stageColor(int stage) => switch (stage) {
-        1 => const Color(0xFF5C6BC0), // awake
-        2 => const Color(0xFF7986CB), // light
-        3 => const Color(0xFF3949AB), // deep
-        4 => const Color(0xFF9575CD), // REM
-        _ => const Color(0xFF7C5CFF),
-      };
+  Color _p = const Color(0xFF7C5CFF); // accent when per-sport colors are off
+  Color _stageColor(int stage) => sportColorsNotifier.value
+      ? switch (stage) {
+          1 => const Color(0xFF5C6BC0), // awake
+          2 => const Color(0xFF7986CB), // light
+          3 => const Color(0xFF3949AB), // deep
+          4 => const Color(0xFF9575CD), // REM
+          _ => const Color(0xFF7C5CFF),
+        }
+      : switch (stage) {
+          1 => _p.withValues(alpha: 0.35),
+          2 => _p.withValues(alpha: 0.6),
+          3 => _p,
+          4 => _p.withValues(alpha: 0.8),
+          _ => _p,
+        };
 
   String _stageName(int stage) => switch (stage) {
         1 => isFr ? 'Éveillé' : 'Awake',
@@ -93,7 +102,8 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
   @override
   Widget build(BuildContext context) {
     final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
-    final violet = const Color(0xFF7C5CFF);
+    _p = s.primary;
+    final violet = sportColorsNotifier.value ? const Color(0xFF7C5CFF) : s.primary;
     final nights = widget.nights;
     final avg7 = nights.length >= 7
         ? nights.reversed.take(7).fold(0.0, (a, e) => a + e.$2) / 7
@@ -211,17 +221,16 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
           ),
         ],
 
-        // ── Week / Month bars ──
+        // ── Week / Month chart (same chart as the other tabs) ──
         if (_m > 0 && nights.length > 1) ...[
           const SizedBox(height: 8),
-          SizedBox(
-            height: 180,
-            child: _SleepBarsChart(
-              data: chartData(),
-              color: violet,
-              targetMin: 420, // 7h target
-            ),
-          ),
+          Builder(builder: (_) {
+            final e = chartData().entries.toList();
+            return ScrubChart(
+              values: [for (final x in e) x.value / 60],
+              color: violet, unit: 'h', decimals: 1,
+              labelOf: (i) => e[i].key);
+          }),
         ],
 
         // ── Statistics ──
@@ -266,8 +275,8 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
           ),
         ],
 
-        // ── Trend chart ──
-        if (nights.length > 3) ...[
+        // ── Trend chart (last 30 nights) ──
+        if (_m == 0 && nights.length > 3) ...[
           const SizedBox(height: 20),
           Text((isFr ? 'Tendance' : 'Trend').toUpperCase(),
               style: t.labelMedium?.copyWith(
@@ -275,11 +284,12 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
                   color: s.onSurfaceVariant,
                   fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
-          MiniArea(
-            v: [for (final e in nights.reversed.take(30).toList().reversed) e.$2],
-            color: violet,
-            height: 80,
-          ),
+          Builder(builder: (_) {
+            final l = nights.reversed.take(30).toList().reversed.toList();
+            return ScrubChart(
+              values: [for (final e in l) e.$2], color: violet, unit: 'h', decimals: 1,
+              labelOf: (i) => '${l[i].$1.day.toString().padLeft(2, '0')}/${l[i].$1.month.toString().padLeft(2, '0')}');
+          }),
         ],
       ])),
     ]));

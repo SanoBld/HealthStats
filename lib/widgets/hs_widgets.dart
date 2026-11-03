@@ -248,7 +248,7 @@ class ScrubChart extends StatefulWidget {
   final String Function(int index)? labelOf;
   final void Function(double? fraction)? onScrub;
   const ScrubChart({super.key, required this.values, required this.color, this.unit = '', this.decimals = 0,
-      this.height = 160, this.labelOf, this.onScrub});
+      this.height = 200, this.labelOf, this.onScrub});
   @override
   State<ScrubChart> createState() => _ScrubChartState();
 }
@@ -315,7 +315,14 @@ class _ScrubChartState extends State<ScrubChart> with SingleTickerProviderStateM
     final a = n < 2 ? 0 : (_lo * (n - 1)).floor().clamp(0, n - 1);
     final b = n < 2 ? 0 : ((_lo + 1 / _zoom) * (n - 1)).ceil().clamp(a + 1, n - 1);
     final vis = n < 2 ? widget.values : widget.values.sublist(a, b + 1);
-    return Column(children: [
+    return Container(
+      padding: const EdgeInsets.fromLTRB(12, 16, 12, 14),
+      decoration: BoxDecoration(
+        color: Color.alphaBlend(s.primaryContainer.withValues(alpha: 0.14), s.surfaceContainer),
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5), width: 1),
+      ),
+      child: Column(children: [
       LayoutBuilder(builder: (_, box) {
         double frac(Offset p) => ((p.dx - _kPad) / (box.maxWidth - _kPad)).clamp(0.0, 1.0).toDouble();
         return Listener(
@@ -374,7 +381,7 @@ class _ScrubChartState extends State<ScrubChart> with SingleTickerProviderStateM
           ]),
         );
       }),
-    ]);
+    ]));
   }
 }
 

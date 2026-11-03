@@ -5,9 +5,8 @@ import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/health_cards.dart';
 import '../widgets/hs_widgets.dart';
-import '../widgets/m3_components.dart' show M3CookieBadge;
+import '../widgets/m3_components.dart' show M3CookieBadge, M3WavyProgress;
 import '../widgets/scroll_status_bar.dart';
-import '../widgets/skeleton.dart' show M3LoadingIndicator;
 import 'metric_page.dart';
 import 'settings_page.dart' show SettingsPage;
 import 'sleep_detail_page.dart';
@@ -76,6 +75,7 @@ class _DashboardPageState extends State<DashboardPage> {
           child: RefreshIndicator(
             onRefresh: () async { await hs.sync(); await _load(); },
             child: ListView(padding: EdgeInsets.only(top: MediaQuery.of(ctx).padding.top + 8, bottom: 32), children: [
+            if (hs.loading) Padding(padding: const EdgeInsets.fromLTRB(20, 0, 20, 4), child: M3WavyProgress(value: hs.progress ?? 0, height: 10)),
             // ── profile header ──
             Padding(padding: const EdgeInsets.fromLTRB(20, 8, 20, 8), child: InkWell(
               borderRadius: BorderRadius.circular(16),
@@ -90,7 +90,6 @@ class _DashboardPageState extends State<DashboardPage> {
                       style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
                   Text(_sub(hs), style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
                 ])),
-                if (hs.loading) const M3LoadingIndicator(size: 30),
               ]),
             )),
             if (!hs.permitted) _ConnectCard(hs: hs),
@@ -107,7 +106,13 @@ class _DashboardPageState extends State<DashboardPage> {
             HealthCard(
               icon: Icons.directions_walk_rounded, title: isFr ? 'Aujourd\'hui' : 'Today', color: fire,
               onTap: () => _push(MetricPage(title: isFr ? 'Pas' : 'Steps', unit: isFr ? 'pas' : 'steps', icon: Icons.directions_walk_rounded, color: fire,
-                  series: daily((d) => d.steps.toDouble()), fmt: (v) => v.round().toString())),
+                  series: daily((d) => d.steps.toDouble()), fmt: (v) => v.round().toString(),
+                  desc: isFr ? 'Nombre de pas faits chaque jour. L\'objectif se règle dans les réglages.' : 'Steps taken each day. Set your goal in settings.',
+                  verdict: (v, fr) => v >= goal
+                      ? (fr ? 'Bien : ta moyenne des 7 derniers jours atteint ton objectif.' : 'Good: your 7-day average reaches your goal.')
+                      : v >= goal * 0.6
+                          ? (fr ? 'Correct : tu es proche de ton objectif, encore un petit effort.' : 'OK: close to your goal, a small push left.')
+                          : (fr ? 'Faible : ta moyenne des 7 derniers jours est loin de ton objectif.' : 'Low: your 7-day average is far from your goal.'))),
               child: Row(children: [
                 RingProgress(value: goal > 0 ? (today?.steps ?? 0) / goal : 0, size: 112,
                     center: '${today?.steps ?? 0}', caption: '/ $goal ${isFr ? 'pas' : 'steps'}'),
@@ -161,6 +166,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 trailing: _rhr.isNotEmpty ? (isFr ? 'au repos' : 'resting') : (isFr ? 'moyenne' : 'average'),
                 onTap: () => _push(MetricPage(title: isFr ? 'Fréquence cardiaque' : 'Heart rate', unit: 'bpm', icon: Icons.favorite_rounded, color: red,
                     series: series, average: true, fmt: (v) => v.round().toString(),
+                    desc: isFr ? 'Nombre de battements du cœur par minute. Au repos, une valeur basse indique en général une bonne forme.' : 'Heartbeats per minute. At rest, a low value usually means good fitness.',
                     verdict: (avg, fr) {
                       final rest = _rhr.isNotEmpty;
                       if (rest) {
@@ -190,7 +196,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 width: (MediaQuery.of(ctx).size.width - 44) / 2,
                 child: _MiniTile(title: m.$1, unit: m.$2, icon: m.$3, color: m.$4, data: m.$5, dec: m.$6,
                     onTap: () => _push(MetricPage(title: m.$1, unit: m.$2, icon: m.$3, color: m.$4, series: m.$5, average: true,
-                        fmt: (v) => v.toStringAsFixed(m.$6)))),
+                        fmt: (v) => v.toStringAsFixed(m.$6), desc: _metricDesc(m.$1), verdict: _metricVerdict(m.$1)))),
               ),
             ])),
 
@@ -304,3 +310,35 @@ class _ConnectCard extends StatelessWidget {
     );
   }
 }
+
+
+// Short description of a vital sign.
+String _metricDesc(String k) => switch (k) {
+      'HRV' => isFr ? 'Variation du temps entre deux battements. Plus elle est haute, mieux ton corps récupère et gère le stress.' : 'Variation in time between heartbeats. Higher usually means better recovery and stress handling.',
+      'SpO₂' => isFr ? 'Taux d\'oxygène dans le sang. Une valeur normale est de 95 à 100 %.' : 'Oxygen level in your blood. Normal is 95 to 100%.',
+      _ => isFr ? 'Ton poids au fil du temps. Regarde la tendance plutôt qu\'une seule mesure.' : 'Your weight over time. Look at the trend rather than a single reading.',
+    };
+
+// Sentence about the current state of a vital sign.
+String Function(double, bool)? _metricVerdict(String k) => switch (k) {
+      'HRV' => (v, fr) => v >= 50
+          ? (fr ? 'Bien : ta HRV est bonne, signe d\'une bonne récupération.' : 'Good: your HRV is good, a sign of good recovery.')
+          : v >= 30
+              ? (fr ? 'Correct : HRV moyenne. Sommeil et repos peuvent l\'améliorer.' : 'OK: average HRV. Sleep and rest can improve it.')
+              : (fr ? 'Faible : HRV basse, ton corps est peut-être fatigué ou stressé.' : 'Low: low HRV, your body may be tired or stressed.'),
+      'SpO₂' => (v, fr) => v >= 95
+          ? (fr ? 'Bien : ton taux d\'oxygène est normal.' : 'Good: your oxygen level is normal.')
+          : v >= 90
+              ? (fr ? 'Un peu bas : en dessous de 95 %. Si ça se répète, demande un avis médical.' : 'A bit low: under 95%. If it repeats, ask a doctor.')
+              : (fr ? 'Bas : en dessous de 90 %. Consulte un médecin.' : 'Low: under 90%. See a doctor.'),
+      _ => (v, fr) {
+          final h = profileHeightNotifier.value / 100;
+          if (h <= 0) return fr ? 'Renseigne ta taille dans le profil pour voir ton IMC.' : 'Add your height in the profile to see your BMI.';
+          final b = v / (h * h);
+          final bs = b.toStringAsFixed(1);
+          if (b < 18.5) return fr ? 'IMC $bs : en dessous de la norme (18,5 à 25).' : 'BMI $bs: below the normal range (18.5 to 25).';
+          if (b < 25) return fr ? 'Bien : IMC $bs, dans la norme (18,5 à 25).' : 'Good: BMI $bs, in the normal range (18.5 to 25).';
+          if (b < 30) return fr ? 'IMC $bs : surpoids léger (25 à 30).' : 'BMI $bs: slightly above normal (25 to 30).';
+          return fr ? 'IMC $bs : au-dessus de 30.' : 'BMI $bs: above 30.';
+        },
+    };

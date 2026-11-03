@@ -88,7 +88,7 @@ class _ChartsPageState extends State<ChartsPage> {
       }
       final share = per.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
 
-      return SafeArea(child: Column(children: [
+      return SafeArea(child: ListView(children: [
         M3PageHeader(showBack: false, title: L.navCharts),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: M3SegmentedButton<_Period>(
           segments: [
@@ -118,8 +118,8 @@ class _ChartsPageState extends State<ChartsPage> {
           ),
         ])),
         Divider(height: 1, thickness: 1, color: Theme.of(ctx).colorScheme.outlineVariant.withValues(alpha: 0.3)),
-        Expanded(
-          child: ListView(padding: const EdgeInsets.only(top: 12, bottom: 32), children: [
+        const SizedBox(height: 12),
+        ...[
             Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TrendChart(key: ValueKey('$_period$_metric$_type'), monthly: series)),
             const SizedBox(height: 16),
             Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: WeekChart(data: byDay)),
@@ -130,8 +130,8 @@ class _ChartsPageState extends State<ChartsPage> {
                 getPlays: (e) => (e as MapEntry<int, int>).value)),
             ],
             ..._trends(hs),
-          ]),
-        ),
+        ],
+        const SizedBox(height: 32),
       ]));
     });
   }
