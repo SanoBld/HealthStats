@@ -37,12 +37,15 @@ class _DashboardPageState extends State<DashboardPage> {
     final hs = HealthService.instance;
     if (!hs.permitted) return;
     _loadedFor = hs.lastSync?.millisecondsSinceEpoch ?? 0;
-    final f = [hs.sleepNights(), hs.metric('restingHr'), hs.metric('hrv'), hs.metric('spo2'), hs.weights()];
     final night = hs.lastSleep();
-    final r = await Future.wait(f);
-    final n = await night;
-    if (!mounted) return;
-    setState(() { _sleep = r[0]; _rhr = r[1]; _hrv = r[2]; _spo2 = r[3]; _weight = r[4]; _night = n; });
+    // 1) recent data first (fast), 2) the whole history
+    for (final d in [90, kAllDays]) {
+      final r = await Future.wait([hs.sleepNights(days: d), hs.metric('restingHr', days: d), hs.metric('hrv', days: d),
+          hs.metric('spo2', days: d), hs.weights(days: d)]);
+      final n = await night;
+      if (!mounted) return;
+      setState(() { _sleep = r[0]; _rhr = r[1]; _hrv = r[2]; _spo2 = r[3]; _weight = r[4]; _night = n; });
+    }
   }
 
   void _push(Widget p) => Navigator.push(context, MaterialPageRoute(builder: (_) => p));

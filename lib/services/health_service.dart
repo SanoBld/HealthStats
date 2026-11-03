@@ -13,6 +13,9 @@ import 'intervals_service.dart';
 
 enum HcStatus { available, updateRequired, unavailable }
 
+/// "Everything": 100 years back (Health Connect only returns what exists).
+const int kAllDays = 36500;
+
 class HealthService extends ChangeNotifier {
   HealthService._();
   static final instance = HealthService._();
@@ -101,7 +104,7 @@ class HealthService extends ChangeNotifier {
 
   /// Sync: ALL available history (as far as Health Connect allows).
   /// Step 1 shows the session list at once, step 2 fills in the stats.
-  Future<void> sync({int daysBack = 3650}) async {
+  Future<void> sync({int daysBack = kAllDays}) async {
     if (loading || !permitted) return;
     loading = true; error = null; progress = null;
     stage = _fr ? 'Lecture des activités…' : 'Reading activities…';
@@ -147,12 +150,23 @@ class HealthService extends ChangeNotifier {
       progress = 0.8;
       notifyListeners();
 
-      // 3) daily totals (optional)
+      // 3) daily totals, recent first: last year, then each older year (stops after 5 empty years in a row)
       try {
-        final ds = await _list('daily', {'start': DateTime.now().subtract(const Duration(days: 3650)).millisecondsSinceEpoch, 'end': end},
-            const Duration(minutes: 2));
-        days = ds.map((e) => DayStat.fromMap(Map.from(e as Map))).toList()
-          ..sort((x, y) => x.day.compareTo(y.day));
+        final byDay = {for (final d in days) d.day: d};
+        var hi = DateTime.now(), empty = 0;
+        for (var y = 0; y < 100 && empty < 5; y++) {
+          final lo = DateTime(hi.year - 1, hi.month, hi.day);
+          stage = _fr ? 'Historique ${lo.year}…' : 'History ${lo.year}…';
+          notifyListeners();
+          final ds = (await _list('daily', {'start': lo.millisecondsSinceEpoch, 'end': hi.millisecondsSinceEpoch},
+              const Duration(minutes: 2))).map((e) => DayStat.fromMap(Map.from(e as Map))).toList();
+          var any = false;
+          for (final d in ds) { byDay[d.day] = d; if (d.steps > 0 || d.hrAvg > 0) any = true; }
+          empty = any ? 0 : empty + 1;
+          days = byDay.values.toList()..sort((x, y) => x.day.compareTo(y.day));
+          notifyListeners(); // the screen already shows this period
+          hi = lo;
+        }
       } catch (_) {}
 
       lastSync = DateTime.now();
@@ -300,7 +314,7 @@ class HealthService extends ChangeNotifier {
   }
 
   /// Values of a metric over [days]: restingHr, hrv, spo2, vo2, resp, bodyFat, systolic, temp.
-  Future<List<(DateTime, double)>> metric(String kind, {int days = 3650}) async {
+  Future<List<(DateTime, double)>> metric(String kind, {int days = kAllDays}) async {
     try {
       final r = (await _ch.invokeMethod<List>('metric', {'kind': kind,
               'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
@@ -315,19 +329,19 @@ class HealthService extends ChangeNotifier {
   }
 
   /// All sleep sessions of the whole history (with real stages when the source gives them).
-  Future<List<Map>> sleepRaw() async {
+  Future<List<Map>> sleepRaw({int days = kAllDays}) async {
     try {
       final r = (await _ch.invokeMethod<List>('sleep', {
-            'start': DateTime.now().subtract(const Duration(days: 3650)).millisecondsSinceEpoch,
+            'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
             'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 60))) ?? [];
       return [for (final e in r) Map.from(e as Map)];
     } catch (_) { return []; }
   }
 
   /// Hours slept per night (whole history), by wake-up day.
-  Future<List<(DateTime, double)>> sleepNights() async {
+  Future<List<(DateTime, double)>> sleepNights({int days = kAllDays}) async {
     try {
-      final r = await sleepRaw();
+      final r = await sleepRaw(days: days);
       final per = <DateTime, double>{};
       for (final e in r) {
         final m = e as Map;
@@ -359,10 +373,10 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return null; }
   }
 
-  Future<List<(DateTime, double)>> weights() async {
+  Future<List<(DateTime, double)>> weights({int days = kAllDays}) async {
     try {
       final r = (await _ch.invokeMethod<List>('weight', {
-            'start': DateTime.now().subtract(const Duration(days: 3650)).millisecondsSinceEpoch,
+            'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
             'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
       return r.map((e) { final l = (e as List).cast<num>();
         return (DateTime.fromMillisecondsSinceEpoch(l[0].toInt()), l[1].toDouble()); }).toList()
