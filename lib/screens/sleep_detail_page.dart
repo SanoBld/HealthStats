@@ -63,10 +63,10 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
       };
 
   String _sleepQuality(double hours) {
-    if (hours >= 7 && hours <= 9) return isFr ? '✅ Bon sommeil' : '✅ Good sleep';
-    if (hours >= 6 && hours < 7) return isFr ? '⚠️ Sommeil insuffisant' : '⚠️ Insufficient sleep';
-    if (hours > 9) return isFr ? '💤 Sommeil long' : '💤 Long sleep';
-    return isFr ? '❌ Sommeil trop court' : '❌ Too little sleep';
+    if (hours >= 7 && hours <= 9) return isFr ? 'Bon sommeil' : 'Good sleep';
+    if (hours >= 6 && hours < 7) return isFr ? 'Sommeil insuffisant' : 'Insufficient sleep';
+    if (hours > 9) return isFr ? 'Sommeil long' : 'Long sleep';
+    return isFr ? 'Sommeil trop court' : 'Too little sleep';
   }
 
   String _sleepAdvice(double hours) {

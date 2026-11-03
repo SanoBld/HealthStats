@@ -10,8 +10,9 @@ class MetricPage extends StatefulWidget {
   final List<(DateTime, double)> series; // one value per day
   final bool average;                    // true = averaged (heart rate), false = summed
   final String Function(double) fmt;
+  final String Function(double avg, bool isFr)? verdict; // short sentence: good or not
   const MetricPage({super.key, required this.title, required this.unit, required this.icon, required this.color,
-      required this.series, required this.fmt, this.average = false});
+      required this.series, required this.fmt, this.average = false, this.verdict});
   @override
   State<MetricPage> createState() => _MetricPageState();
 }
@@ -75,8 +76,42 @@ class _MetricPageState extends State<MetricPage> {
                 : widget.average ? (isFr ? 'moyenne' : 'average')
                 : '${isFr ? 'moyenne' : 'average'} ${widget.fmt(avg)} ${widget.unit}${_m == 3 ? (isFr ? ' / mois' : ' / month') : (isFr ? ' / jour' : ' / day')}'),
             const SizedBox(height: 14),
-            if (data.length >= 2) TrendChart(monthly: data, showStats: false)
+            if (data.length >= 2) TrendChart(monthly: data, showStats: false, color: widget.color)
             else Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(isFr ? 'Pas assez de données' : 'Not enough data'))),
+            if (widget.average && vals.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: s.surfaceContainer,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5)),
+                ),
+                child: Row(children: [
+                  for (final e in [
+                    (isFr ? 'Min' : 'Min', vals.reduce((a, b) => a < b ? a : b)),
+                    (isFr ? 'Moy.' : 'Avg', avg.round()),
+                    (isFr ? 'Max' : 'Max', vals.reduce((a, b) => a > b ? a : b)),
+                  ]) Expanded(child: Column(children: [
+                    Text(e.$1, style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
+                    const SizedBox(height: 4),
+                    Text('${e.$2} ${widget.unit}', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: widget.color)),
+                  ])),
+                ]),
+              ),
+              if (widget.verdict != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: widget.color.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(24),
+                  ),
+                  child: Text(widget.verdict!(avg, isFr), style: t.bodyMedium?.copyWith(height: 1.35)),
+                ),
+              ],
+            ],
           ]),
         ),
       ]),

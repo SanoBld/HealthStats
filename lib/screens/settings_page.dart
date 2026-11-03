@@ -249,7 +249,7 @@ class _UpdatesPageState extends State<_UpdatesPage> {
     setState(() { _checking = true; _upMsg = null; });
     final info = await UpdateService.checkForUpdate(channel: _beta ? UpdateChannel.beta : UpdateChannel.stable);
     if (!mounted) return;
-    setState(() { _checking = false; _upMsg = info == null ? (isFr ? 'À jour ✔' : 'Up to date ✔') : 'v${info.version}'; });
+    setState(() { _checking = false; _upMsg = info == null ? (isFr ? 'À jour' : 'Up to date ✔') : 'v${info.version}'; });
     if (info != null && info.downloadUrl != null) {
       await showUpdateInstall(context, url: info.downloadUrl!, kind: info.downloadKind, version: info.version);
     }

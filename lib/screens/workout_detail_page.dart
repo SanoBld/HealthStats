@@ -13,6 +13,17 @@ Widget hsTileLayer(BuildContext c) {
     urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     userAgentPackageName: 'com.healthstats.app',
     maxNativeZoom: 19,
+    // Dark theme = dark map (invert the light tiles), light theme = normal map
+    tileBuilder: Theme.of(c).brightness == Brightness.dark
+        ? (ctx, tile, _) => ColorFiltered(
+              colorFilter: const ColorFilter.matrix(<double>[
+                -0.75, 0, 0, 0, 255,
+                0, -0.75, 0, 0, 255,
+                0, 0, -0.75, 0, 255,
+                0, 0, 0, 1, 0,
+              ]),
+              child: tile)
+        : null,
   );
 }
 

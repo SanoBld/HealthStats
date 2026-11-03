@@ -136,10 +136,10 @@ class _DashboardPageState extends State<DashboardPage> {
                   // Sleep quality summary
                   Text(
                     _night!.minutes >= 420 && _night!.minutes <= 540
-                        ? (isFr ? '✅ Bon sommeil' : '✅ Good sleep')
+                        ? (isFr ? 'Bon sommeil' : 'Good sleep')
                         : _night!.minutes >= 360
-                            ? (isFr ? '⚠️ Insuffisant' : '⚠️ Insufficient')
-                            : (isFr ? '❌ Trop court' : '❌ Too short'),
+                            ? (isFr ? 'Insuffisant' : 'Insufficient')
+                            : (isFr ? 'Trop court' : 'Too short'),
                     style: t.labelMedium?.copyWith(fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 12),
@@ -160,7 +160,18 @@ class _DashboardPageState extends State<DashboardPage> {
                 icon: Icons.favorite_rounded, title: isFr ? 'Fréquence cardiaque' : 'Heart rate', color: red,
                 trailing: _rhr.isNotEmpty ? (isFr ? 'au repos' : 'resting') : (isFr ? 'moyenne' : 'average'),
                 onTap: () => _push(MetricPage(title: isFr ? 'Fréquence cardiaque' : 'Heart rate', unit: 'bpm', icon: Icons.favorite_rounded, color: red,
-                    series: series, average: true, fmt: (v) => v.round().toString())),
+                    series: series, average: true, fmt: (v) => v.round().toString(),
+                    verdict: (avg, fr) {
+                      final rest = _rhr.isNotEmpty;
+                      if (rest) {
+                        if (avg < 50) return fr ? 'Très bien : fréquence au repos très basse, signe d\'une excellente condition physique.' : 'Great: very low resting rate, a sign of excellent fitness.';
+                        if (avg <= 70) return fr ? 'Bien : fréquence au repos dans la norme (60 à 100 bpm), plutôt bonne.' : 'Good: resting rate is normal (60 to 100 bpm), on the good side.';
+                        if (avg <= 100) return fr ? 'Correct : dans la norme mais un peu haute. Sommeil, stress et sport peuvent la faire baisser.' : 'OK: within normal range but a bit high. Sleep, stress and exercise can lower it.';
+                        return fr ? 'Élevée : au-dessus de 100 bpm au repos. Si ça dure, parle-en à un médecin.' : 'High: above 100 bpm at rest. If it lasts, talk to a doctor.';
+                      }
+                      if (avg < 100) return fr ? 'Bien : ta fréquence moyenne sur la journée reste raisonnable.' : 'Good: your daily average rate is reasonable.';
+                      return fr ? 'Élevée : moyenne haute, probablement due à l\'activité. Regarde la fréquence au repos.' : 'High: high average, probably from activity. Check your resting rate.';
+                    })),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   BigValue(last.round().toString(), 'bpm', caption: fmtDay(series.last.$1)),
                   const SizedBox(height: 8),

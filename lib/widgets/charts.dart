@@ -26,7 +26,8 @@ String _monthShort(String key) {
 class TrendChart extends StatefulWidget {
   final Map<String, int> monthly;
   final bool showStats;
-  const TrendChart({super.key, required this.monthly, this.showStats = true});
+  final Color? color; // same chart, metric color
+  const TrendChart({super.key, required this.monthly, this.showStats = true, this.color});
   @override
   State<TrendChart> createState() => TrendChartState();
 }
@@ -136,7 +137,7 @@ class TrendChartState extends State<TrendChart> with SingleTickerProviderStateMi
                     v: vals, labels: labels,
                     progress: Curves.easeOutCubic.transform(_anim.value),
                     sel: _sel, lo: lo, hi: lo + span,
-                    line: s.primary, accent: s.tertiary,
+                    line: widget.color ?? s.primary, accent: widget.color ?? s.tertiary,
                     grid: s.outlineVariant.withValues(alpha: 0.45),
                     text: s.onSurfaceVariant, surface: bg,
                     onSurface: s.onSurface,
@@ -314,7 +315,7 @@ class WeekChartState extends State<WeekChart> {
         Row(children: [
           Expanded(child: Text(tx('ui_activity_by_day_of_wee'),
               style: t.labelMedium?.copyWith(fontWeight: FontWeight.w700))),
-          _PeakChip(label: '📅 ${labels[peak - 1]}',
+          _PeakChip(label: '${labels[peak - 1]}',
               color: s.tertiaryContainer, onColor: s.onTertiaryContainer, t: t),
         ]),
         const SizedBox(height: 12),
