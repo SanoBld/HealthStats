@@ -371,13 +371,13 @@ class _ScrubChartState extends State<ScrubChart> with SingleTickerProviderStateM
         final avgVal = widget.values.reduce((a, b) => a + b) / widget.values.length;
         String fmtV(double v) => widget.decimals > 0 ? v.toStringAsFixed(widget.decimals) : v.round().toString();
         return Padding(
-          padding: const EdgeInsets.only(top: 8, left: _kPad, right: 8),
+          padding: const EdgeInsets.only(top: 14),
           child: Row(children: [
-            _DataChip(label: isFr ? 'Min' : 'Min', value: '${fmtV(minVal)} ${widget.unit}', color: s.outline),
+            Expanded(child: StatBadge(icon: Icons.trending_down_rounded, label: 'Min', value: '${fmtV(minVal)} ${widget.unit}', color: s.outline)),
             const SizedBox(width: 8),
-            _DataChip(label: isFr ? 'Moy.' : 'Avg', value: '${fmtV(avgVal)} ${widget.unit}', color: widget.color),
+            Expanded(child: StatBadge(icon: Icons.equalizer_rounded, label: isFr ? 'Moy.' : 'Avg', value: '${fmtV(avgVal)} ${widget.unit}', color: widget.color)),
             const SizedBox(width: 8),
-            _DataChip(label: isFr ? 'Max' : 'Max', value: '${fmtV(maxVal)} ${widget.unit}', color: s.tertiary),
+            Expanded(child: StatBadge(icon: Icons.trending_up_rounded, label: 'Max', value: '${fmtV(maxVal)} ${widget.unit}', color: s.tertiary)),
           ]),
         );
       }),
@@ -385,33 +385,61 @@ class _ScrubChartState extends State<ScrubChart> with SingleTickerProviderStateM
   }
 }
 
-class _DataChip extends StatelessWidget {
-  final String label, value;
-  final Color color;
-  const _DataChip({required this.label, required this.value, required this.color});
-
+/// Same small stat tile everywhere (under every chart).
+class StatBadge extends StatelessWidget {
+  final IconData icon; final String label, value; final Color color;
+  const StatBadge({super.key, required this.icon, required this.label, required this.value, required this.color});
   @override
   Widget build(BuildContext context) {
-    final s = Theme.of(context).colorScheme;
-    final t = Theme.of(context).textTheme;
-    return Expanded(
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        decoration: BoxDecoration(
-          color: s.surfaceContainerHigh.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: s.outlineVariant.withValues(alpha: 0.4), width: 1),
-        ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(label, style: t.labelSmall?.copyWith(color: s.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w600)),
-          const SizedBox(width: 5),
-          Flexible(child: Text(value, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: t.labelSmall?.copyWith(fontWeight: FontWeight.w800, fontSize: 11))),
-        ]),
+    final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: s.surfaceContainerHighest.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: s.outlineVariant.withValues(alpha: 0.4), width: 1),
       ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+        Row(children: [
+          Icon(icon, size: 14, color: color), const SizedBox(width: 4),
+          Expanded(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis,
+              style: t.labelSmall?.copyWith(color: s.onSurfaceVariant, fontSize: 10, fontWeight: FontWeight.w600))),
+        ]),
+        const SizedBox(height: 2),
+        Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+      ]),
     );
   }
 }
+
+/// Apple Health style card: colored title, one clear sentence, then the data.
+class HighlightCard extends StatelessWidget {
+  final IconData icon; final String title, sentence; final Color color; final Widget? child;
+  const HighlightCard({super.key, required this.icon, required this.title, required this.sentence, required this.color, this.child});
+  @override
+  Widget build(BuildContext context) {
+    final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: s.surfaceContainer,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5), width: 1),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(icon, size: 18, color: color), const SizedBox(width: 6),
+          Expanded(child: Text(title, style: t.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w800))),
+        ]),
+        const SizedBox(height: 10),
+        Text(sentence, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w700, height: 1.3)),
+        if (child != null) ...[const SizedBox(height: 14), child!],
+      ]),
+    );
+  }
+}
+
 
 const double _kPad = 34;
 

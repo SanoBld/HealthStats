@@ -2,7 +2,7 @@
 import 'package:flutter/material.dart';
 import '../widgets/charts.dart';
 import '../widgets/health_cards.dart';
-import '../widgets/hs_widgets.dart' show isFr;
+import '../widgets/hs_widgets.dart' show isFr, StatBadge, HighlightCard;
 import '../widgets/m3_components.dart' show M3SegmentedButton;
 
 class MetricPage extends StatefulWidget {
@@ -82,45 +82,34 @@ class _MetricPageState extends State<MetricPage> {
                 : widget.average ? (isFr ? 'moyenne' : 'average')
                 : '${isFr ? 'moyenne' : 'average'} ${widget.fmt(avg)} ${widget.unit}${_m == 3 ? (isFr ? ' / mois' : ' / month') : (isFr ? ' / jour' : ' / day')}'),
             const SizedBox(height: 14),
+            if (vals.isNotEmpty) ...[
+              HighlightCard(
+                icon: widget.icon, color: widget.color, title: widget.title,
+                sentence: widget.verdict != null
+                    ? widget.verdict!(widget.average ? avg : _recent(), isFr)
+                    : (isFr ? 'Entre ${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} et ${widget.fmt(vals.reduce((a, b) => a > b ? a : b).toDouble())} ${widget.unit} sur cette période.'
+                            : 'Between ${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} and ${widget.fmt(vals.reduce((a, b) => a > b ? a : b).toDouble())} ${widget.unit} over this period.'),
+              ),
+              const SizedBox(height: 12),
+            ],
             if (data.length >= 2) TrendChart(monthly: data, showStats: false, color: widget.color)
             else Padding(padding: const EdgeInsets.all(32), child: Center(child: Text(isFr ? 'Pas assez de données' : 'Not enough data'))),
+            if (vals.isNotEmpty) ...[
+              const SizedBox(height: 12),
+              Row(children: [
+                Expanded(child: StatBadge(icon: Icons.trending_down_rounded, label: 'Min', color: s.outline,
+                    value: '${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} ${widget.unit}')),
+                const SizedBox(width: 8),
+                Expanded(child: StatBadge(icon: Icons.equalizer_rounded, label: isFr ? 'Moy.' : 'Avg', color: widget.color,
+                    value: '${widget.fmt(avg)} ${widget.unit}')),
+                const SizedBox(width: 8),
+                Expanded(child: StatBadge(icon: Icons.trending_up_rounded, label: 'Max', color: s.tertiary,
+                    value: '${widget.fmt(vals.reduce((a, b) => a > b ? a : b).toDouble())} ${widget.unit}')),
+              ]),
+            ],
             if (widget.desc != null) ...[
               const SizedBox(height: 16),
               Text(widget.desc!, style: t.bodyMedium?.copyWith(color: s.onSurfaceVariant, height: 1.35)),
-            ],
-            if (widget.average && vals.isNotEmpty) ...[
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: s.surfaceContainer,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5)),
-                ),
-                child: Row(children: [
-                  for (final e in [
-                    (isFr ? 'Min' : 'Min', vals.reduce((a, b) => a < b ? a : b)),
-                    (isFr ? 'Moy.' : 'Avg', avg.round()),
-                    (isFr ? 'Max' : 'Max', vals.reduce((a, b) => a > b ? a : b)),
-                  ]) Expanded(child: Column(children: [
-                    Text(e.$1, style: t.labelMedium?.copyWith(color: s.onSurfaceVariant)),
-                    const SizedBox(height: 4),
-                    Text('${e.$2} ${widget.unit}', style: t.titleMedium?.copyWith(fontWeight: FontWeight.w800, color: widget.color)),
-                  ])),
-                ]),
-              ),
-            ],
-            if (widget.verdict != null && vals.isNotEmpty) ...[
-              const SizedBox(height: 16),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: widget.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(24),
-                  ),
-                  child: Text(widget.verdict!(widget.average ? avg : _recent(), isFr), style: t.bodyMedium?.copyWith(height: 1.35)),
-                ),
             ],
           ]),
         ),

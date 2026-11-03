@@ -1,7 +1,6 @@
 // Import of GPX / FIT files (Strava export, Garmin, Nothing, any app).
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
-import '../app_state.dart';
 import '../services/health_service.dart';
 import '../widgets/hs_widgets.dart';
 import '../widgets/m3_components.dart';

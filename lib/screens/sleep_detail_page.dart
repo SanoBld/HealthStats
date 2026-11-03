@@ -2,11 +2,10 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import '../app_state.dart';
-import '../models/health_models.dart';
 import '../services/health_service.dart';
 import '../widgets/health_cards.dart';
 import '../widgets/hs_widgets.dart';
-import '../widgets/m3_components.dart' show M3SegmentedButton, M3CookieBadge;
+import '../widgets/m3_components.dart' show M3SegmentedButton;
 
 class SleepDetailPage extends StatefulWidget {
   final List<(DateTime, double)> nights; // hours per night
@@ -197,40 +196,15 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
 
         // ── Sleep stages (last night) ──
         if (_m == 0 && lastNight != null && lastNight.stages.isNotEmpty) ...[
-          _SleepStagesChart(stages: lastNight.stages, stageColor: _stageColor, stageName: _stageName),
+          _ScoreCard(night: lastNight, all: _details, color: violet),
           const SizedBox(height: 16),
-          // Stage breakdown
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: s.surfaceContainer,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5), width: 1),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(isFr ? 'Répartition' : 'Breakdown',
-                  style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
-              const SizedBox(height: 12),
-              for (final stage in lastNight.stages) _StageRow(
-                name: _stageName(stage.type),
-                minutes: stage.minutes,
-                total: lastNight.totalMinutes,
-                color: _stageColor(stage.type),
-              ),
-            ]),
-          ),
+          _SleepStagesChart(night: lastNight, stageColor: _stageColor, stageName: _stageName, accent: violet),
         ],
 
-        // ── Week / Month chart (same chart as the other tabs) ──
+        // ── Week / Month bars with 7 h target ──
         if (_m > 0 && nights.length > 1) ...[
           const SizedBox(height: 8),
-          Builder(builder: (_) {
-            final e = chartData().entries.toList();
-            return ScrubChart(
-              values: [for (final x in e) x.value / 60],
-              color: violet, unit: 'h', decimals: 1,
-              labelOf: (i) => e[i].key);
-          }),
+          _SleepBarsChart(data: chartData(), color: violet, targetMin: 420),
         ],
 
         // ── Statistics ──
@@ -339,202 +313,279 @@ extension _SleepSessions on HealthService {
   }
 }
 
-// ── Sleep stages horizontal chart ──
-class _SleepStagesChart extends StatelessWidget {
-  final List<_SleepStage> stages;
-  final Color Function(int) stageColor;
-  final String Function(int) stageName;
-  const _SleepStagesChart({
-    required this.stages,
-    required this.stageColor,
-    required this.stageName,
-  });
+// ── Card helper (same card as the charts) ──
+BoxDecoration _sleepCard(ColorScheme s, Color tint) => BoxDecoration(
+      color: Color.alphaBlend(tint.withValues(alpha: 0.10), s.surfaceContainer),
+      borderRadius: BorderRadius.circular(28),
+      border: Border.all(color: s.outlineVariant.withValues(alpha: 0.5), width: 1),
+    );
 
-  @override
-  Widget build(BuildContext c) {
-    final total = stages.fold(0, (a, s) => a + s.minutes);
-    if (total <= 0) return const SizedBox.shrink();
-    final t = Theme.of(c).textTheme;
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text((isFr ? 'Phases de sommeil' : 'Sleep stages').toUpperCase(),
-          style: t.labelMedium?.copyWith(
-              letterSpacing: 1.2,
-              color: Theme.of(c).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w700)),
-      const SizedBox(height: 10),
-      TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: 1),
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeOutCubic,
-        builder: (_, p, _) => ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: SizedBox(
-            height: 28,
-            child: Row(children: [
-              for (final s in stages)
-                Expanded(
-                  flex: (s.minutes * 100 / total * p).round().clamp(1, 100),
-                  child: Container(
-                    color: stageColor(s.type),
-                    alignment: Alignment.center,
-                    child: s.minutes / total > 0.12
-                        ? Text(
-                            '${(s.minutes / total * 100).round()}%',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          )
-                        : null,
-                  ),
-                ),
-            ]),
-          ),
-        ),
-      ),
-      const SizedBox(height: 10),
-      Wrap(spacing: 16, runSpacing: 6, children: [
-        for (final s in stages)
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            Container(
-              width: 10, height: 10,
-              decoration: BoxDecoration(
-                color: stageColor(s.type),
-                borderRadius: BorderRadius.circular(3),
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '${stageName(s.type)} ${s.minutes} min',
-              style: t.labelSmall?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ]),
-      ]),
-    ]);
-  }
+String _clk(DateTime d) => '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+double _tod(DateTime d) { // minutes since 18:00 so that night times stay continuous
+  var m = d.hour * 60.0 + d.minute - 18 * 60;
+  if (m < 0) m += 1440;
+  return m;
 }
 
-// ── Sleep bars chart (week / month) ──
-class _SleepBarsChart extends StatelessWidget {
-  final Map<String, int> data; // label -> minutes
-  final Color color;
-  final int targetMin;
-  const _SleepBarsChart({
-    required this.data,
-    required this.color,
-    this.targetMin = 420,
-  });
+// ── Sleep score (like Apple: duration / bedtime / interruptions) ──
+class _ScoreCard extends StatelessWidget {
+  final _SleepNight night; final List<_SleepNight> all; final Color color;
+  const _ScoreCard({required this.night, required this.all, required this.color});
 
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
-    final maxMin = data.values.fold(targetMin, (a, b) => math.max(a, b));
-    final entries = data.entries.toList();
-    return TweenAnimationBuilder<double>(
-      tween: Tween(begin: 0, end: 1),
-      duration: const Duration(milliseconds: 800),
-      curve: Curves.easeOutCubic,
-      builder: (_, p, _) => Column(children: [
-        Expanded(
-          child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
-            for (var i = 0; i < entries.length; i++)
-              Expanded(child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 1),
-                child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
-                  Container(
-                    height: math.max(4.0, 120 * entries[i].value / maxMin * p),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(6),
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          color.withValues(alpha: entries[i].value >= targetMin ? 0.8 : 0.35),
-                          color.withValues(alpha: entries[i].value >= targetMin ? 1 : 0.6),
-                        ],
-                      ),
-                    ),
-                  ),
-                ]),
-              )),
+    final dur = (night.totalMinutes / 480 * 50).clamp(0, 50).toDouble();
+    final awake = night.stages.where((e) => e.type == 1).length;
+    final inter = (20 - awake * 4).clamp(0, 20).toDouble();
+    final others = all.where((e) => e.start != night.start).toList();
+    double? diff; // minutes later than the usual bedtime (negative = earlier)
+    if (others.isNotEmpty) {
+      final avg = others.fold(0.0, (a, e) => a + _tod(e.start)) / others.length;
+      diff = _tod(night.start) - avg;
+    }
+    final bed = diff == null ? 30.0 : (30 - diff.abs() / 2).clamp(0, 30).toDouble();
+    final score = (dur + bed + inter).round();
+    final label = score >= 80 ? (isFr ? 'Élevé' : 'High') : score >= 60 ? (isFr ? 'Moyen' : 'Medium') : (isFr ? 'Faible' : 'Low');
+    final sentence = diff == null
+        ? (isFr ? 'Ton score est calculé sur la durée et les interruptions.' : 'Your score is based on duration and interruptions.')
+        : diff.abs() < 10
+            ? (isFr ? 'Tu t\'es couché à ton heure habituelle.' : 'You went to bed at your usual time.')
+            : diff < 0
+                ? (isFr ? 'Tu t\'es couché ${diff.abs().round()} min plus tôt que d\'habitude.' : 'You went to bed ${diff.abs().round()} min earlier than usual.')
+                : (isFr ? 'Tu t\'es couché ${diff.round()} min plus tard que d\'habitude.' : 'You went to bed ${diff.round()} min later than usual.');
+    Widget row(Color col, String name, double v, int max) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 2),
+          child: Row(children: [
+            Container(width: 9, height: 9, decoration: BoxDecoration(color: col, shape: BoxShape.circle)),
+            const SizedBox(width: 8),
+            Expanded(child: Text(name, style: t.bodySmall)),
+            Text('${v.round()}/$max', style: t.bodySmall?.copyWith(fontWeight: FontWeight.w800)),
           ]),
-        ),
-        const SizedBox(height: 6),
+        );
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: _sleepCard(s, color),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
-          for (var i = 0; i < entries.length; i++)
-            Expanded(child: Center(
-              child: Text(
-                entries.length <= 10 ? entries[i].key : (i % 5 == 0 ? entries[i].key : ''),
-                style: t.labelSmall?.copyWith(
-                  color: s.onSurfaceVariant,
-                  fontSize: 8,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.clip,
-              ),
-            )),
+          Icon(Icons.bedtime_rounded, size: 18, color: color), const SizedBox(width: 6),
+          Text(isFr ? 'Score de sommeil' : 'Sleep score', style: t.labelLarge?.copyWith(color: color, fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text(label, style: t.headlineSmall?.copyWith(fontWeight: FontWeight.w800)),
+            const SizedBox(height: 6),
+            row(color, isFr ? 'Durée' : 'Duration', dur, 50),
+            row(color.withValues(alpha: 0.65), isFr ? 'Heure de coucher' : 'Bedtime', bed, 30),
+            row(color.withValues(alpha: 0.35), isFr ? 'Interruptions' : 'Interruptions', inter, 20),
+          ])),
+          const SizedBox(width: 12),
+          SizedBox(width: 96, height: 96, child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 900), curve: Curves.easeOutCubic,
+            builder: (_, p, _) => CustomPaint(
+              painter: _RingPainter([dur / 100, bed / 100, inter / 100], [color, color.withValues(alpha: 0.65), color.withValues(alpha: 0.35)],
+                  s.surfaceContainerHighest, p),
+              child: Center(child: Text('$score', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w800))),
+            ),
+          )),
+        ]),
+        const SizedBox(height: 12),
+        Text(sentence, style: t.bodyMedium?.copyWith(color: s.onSurfaceVariant, height: 1.3)),
+      ]),
+    );
+  }
+}
+
+class _RingPainter extends CustomPainter {
+  final List<double> parts; final List<Color> cols; final Color track; final double p;
+  _RingPainter(this.parts, this.cols, this.track, this.p);
+  @override
+  void paint(Canvas c, Size size) {
+    final r = Rect.fromLTWH(7, 7, size.width - 14, size.height - 14);
+    final base = Paint()..style = PaintingStyle.stroke..strokeWidth = 11..color = track;
+    c.drawArc(r, 0, 6.2832, false, base);
+    var a = -1.5708;
+    for (var i = 0; i < parts.length; i++) {
+      final sw = 6.2832 * parts[i] * p;
+      if (sw > 0.02) {
+        c.drawArc(r, a, sw - 0.04, false, Paint()..style = PaintingStyle.stroke..strokeWidth = 11..strokeCap = StrokeCap.round..color = cols[i]);
+      }
+      a += 6.2832 * parts[i] * p;
+    }
+  }
+  @override
+  bool shouldRepaint(_RingPainter o) => o.p != p || o.parts != parts;
+}
+
+// ── Sleep stages timeline (like Apple: one row per stage, blocks over time) ──
+class _SleepStagesChart extends StatelessWidget {
+  final _SleepNight night; final Color accent;
+  final Color Function(int) stageColor;
+  final String Function(int) stageName;
+  const _SleepStagesChart({required this.night, required this.stageColor, required this.stageName, required this.accent});
+
+  @override
+  Widget build(BuildContext c) {
+    final stages = night.stages;
+    final total = stages.fold(0, (a, e) => a + e.minutes);
+    if (total <= 0) return const SizedBox.shrink();
+    final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
+    const rows = [1, 4, 2, 3]; // awake, REM, light, deep
+    final sums = {for (final r in rows) r: stages.where((e) => e.type == r).fold(0, (a, e) => a + e.minutes)};
+    String dm(int m) => m >= 60 ? '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')}' : '$m min';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: _sleepCard(s, accent),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.stacked_line_chart_rounded, size: 18, color: accent), const SizedBox(width: 6),
+          Text(isFr ? 'Phases de sommeil' : 'Sleep stages', style: t.labelLarge?.copyWith(color: accent, fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 12),
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 900), curve: Curves.easeOutCubic,
+          builder: (_, p, _) => SizedBox(height: 150, width: double.infinity, child: CustomPaint(
+            painter: _HypnoPainter(stages, total, rows, stageColor, stageName, s.onSurfaceVariant,
+                s.outlineVariant.withValues(alpha: 0.35), _clk(night.start), _clk(night.end), p))),
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          for (final r in rows) Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: stageColor(r), shape: BoxShape.circle)),
+              const SizedBox(width: 4),
+              Flexible(child: Text(stageName(r), maxLines: 1, overflow: TextOverflow.ellipsis,
+                  style: t.labelSmall?.copyWith(color: s.onSurfaceVariant, fontSize: 10))),
+            ]),
+            const SizedBox(height: 2),
+            Text(dm(sums[r] ?? 0), style: t.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+          ])),
         ]),
       ]),
     );
   }
 }
 
-// ── Stage row ──
-class _StageRow extends StatelessWidget {
-  final String name;
-  final int minutes, total;
-  final Color color;
-  const _StageRow({
-    required this.name,
-    required this.minutes,
-    required this.total,
-    required this.color,
-  });
+class _HypnoPainter extends CustomPainter {
+  final List<_SleepStage> st; final int total; final List<int> rows;
+  final Color Function(int) col; final String Function(int) name;
+  final Color text, grid; final String t0, t1; final double p;
+  _HypnoPainter(this.st, this.total, this.rows, this.col, this.name, this.text, this.grid, this.t0, this.t1, this.p);
+  void _txt(Canvas c, String s, Offset o, ) {
+    final tp = TextPainter(text: TextSpan(text: s, style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.w600)),
+        textDirection: TextDirection.ltr)..layout();
+    tp.paint(c, o);
+  }
+  @override
+  void paint(Canvas c, Size size) {
+    const padL = 52.0, bottom = 18.0;
+    final w = size.width - padL, rh = (size.height - bottom) / rows.length;
+    for (var i = 0; i < rows.length; i++) {
+      final y = rh * i + rh / 2;
+      c.drawLine(Offset(padL, y), Offset(size.width, y), Paint()..color = grid..strokeWidth = 1);
+      _txt(c, name(rows[i]), Offset(0, y - 5));
+    }
+    c.save();
+    c.clipRect(Rect.fromLTWH(padL, 0, w * p, size.height));
+    var cum = 0;
+    for (final e in st) {
+      final i = rows.indexOf(e.type);
+      if (i >= 0) {
+        final x = padL + w * cum / total, bw = (w * e.minutes / total).clamp(3.0, w);
+        final y = rh * i + rh / 2;
+        c.drawRRect(RRect.fromRectAndRadius(Rect.fromLTWH(x, y - rh * 0.3, bw, rh * 0.6), const Radius.circular(5)),
+            Paint()..color = col(e.type));
+      }
+      cum += e.minutes;
+    }
+    c.restore();
+    _txt(c, t0, Offset(padL, size.height - 10));
+    _txt(c, t1, Offset(size.width - 26, size.height - 10));
+  }
+  @override
+  bool shouldRepaint(_HypnoPainter o) => o.p != p || o.st != st;
+}
 
+// ── Sleep bars (week / month): target line, last night highlighted, tap to read ──
+class _SleepBarsChart extends StatefulWidget {
+  final Map<String, int> data; // label -> minutes
+  final Color color;
+  final int targetMin;
+  const _SleepBarsChart({required this.data, required this.color, this.targetMin = 420});
+  @override
+  State<_SleepBarsChart> createState() => _SleepBarsChartState();
+}
+
+class _SleepBarsChartState extends State<_SleepBarsChart> {
+  int? _sel;
   @override
   Widget build(BuildContext c) {
-    final t = Theme.of(c).textTheme, s = Theme.of(c).colorScheme;
-    final pct = total > 0 ? minutes / total : 0.0;
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(children: [
-        Container(
-          width: 12, height: 12,
-          decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(4)),
+    final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
+    final e = widget.data.entries.toList();
+    final maxMin = e.fold(widget.targetMin, (a, x) => math.max(a, x.value));
+    final done = e.where((x) => x.value > 0).toList();
+    final avg = done.isEmpty ? 0 : done.fold(0, (a, x) => a + x.value) ~/ done.length;
+    String hm(int m) => '${m ~/ 60} h ${(m % 60).toString().padLeft(2, '0')}';
+    final si = _sel ?? (e.isEmpty ? null : e.length - 1);
+    const h = 150.0;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      decoration: _sleepCard(s, widget.color),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Icon(Icons.bar_chart_rounded, size: 18, color: widget.color), const SizedBox(width: 6),
+          Text(isFr ? 'Durée par nuit' : 'Duration per night', style: t.labelLarge?.copyWith(color: widget.color, fontWeight: FontWeight.w800)),
+          const Spacer(),
+          if (si != null) Text('${e[si].key} · ${e[si].value > 0 ? hm(e[si].value) : '–'}',
+              style: t.labelLarge?.copyWith(fontWeight: FontWeight.w800)),
+        ]),
+        const SizedBox(height: 12),
+        TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 800), curve: Curves.easeOutCubic,
+          builder: (_, p, _) => SizedBox(height: h, child: Stack(children: [
+            Positioned(left: 0, right: 0, bottom: h * widget.targetMin / maxMin,
+                child: Container(height: 1.5, color: s.tertiary.withValues(alpha: 0.7))),
+            Positioned(right: 0, bottom: h * widget.targetMin / maxMin + 3,
+                child: Text('${widget.targetMin ~/ 60} h', style: t.labelSmall?.copyWith(color: s.tertiary, fontSize: 9, fontWeight: FontWeight.w700))),
+            LayoutBuilder(builder: (_, box) => GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) => setState(() => _sel = (d.localPosition.dx / box.maxWidth * e.length).floor().clamp(0, e.length - 1)),
+              onHorizontalDragUpdate: (d) => setState(() => _sel = (d.localPosition.dx / box.maxWidth * e.length).floor().clamp(0, e.length - 1)),
+              child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                for (var i = 0; i < e.length; i++) Expanded(child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: e.length > 14 ? 1 : 3),
+                  child: Align(alignment: Alignment.bottomCenter, child: Container(
+                    height: math.max(4.0, h * e[i].value / maxMin * p),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(6),
+                      color: i == si ? widget.color : widget.color.withValues(alpha: e[i].value >= widget.targetMin ? 0.6 : 0.3)),
+                  )),
+                )),
+              ]),
+            )),
+          ])),
         ),
-        const SizedBox(width: 10),
-        SizedBox(width: 80, child: Text(name, style: t.bodySmall?.copyWith(fontWeight: FontWeight.w600))),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: pct),
-              duration: const Duration(milliseconds: 800),
-              curve: Curves.easeOutCubic,
-              builder: (_, v, _) => LinearProgressIndicator(
-                value: v,
-                minHeight: 10,
-                color: color,
-                backgroundColor: color.withValues(alpha: 0.12),
-              ),
-            ),
-          ),
-        ),
-        SizedBox(
-          width: 85,
-          child: Text(
-            '$minutes min · ${(pct * 100).round()}%',
-            textAlign: TextAlign.end,
-            style: t.labelSmall?.copyWith(color: s.onSurfaceVariant),
-          ),
-        ),
+        const SizedBox(height: 6),
+        Row(children: [
+          for (var i = 0; i < e.length; i++) Expanded(child: Center(child: Text(
+            e.length <= 10 ? e[i].key : (i % 5 == 0 ? e[i].key : ''),
+            maxLines: 1, overflow: TextOverflow.clip,
+            style: t.labelSmall?.copyWith(color: s.onSurfaceVariant, fontSize: 8)))),
+        ]),
+        const SizedBox(height: 12),
+        Row(children: [
+          Expanded(child: StatBadge(icon: Icons.equalizer_rounded, label: isFr ? 'Moy.' : 'Avg', value: hm(avg), color: widget.color)),
+          const SizedBox(width: 8),
+          Expanded(child: StatBadge(icon: Icons.trending_up_rounded, label: 'Max', value: hm(done.isEmpty ? 0 : done.map((x) => x.value).reduce(math.max)), color: s.tertiary)),
+          const SizedBox(width: 8),
+          Expanded(child: StatBadge(icon: Icons.trending_down_rounded, label: 'Min', value: hm(done.isEmpty ? 0 : done.map((x) => x.value).reduce(math.min)), color: s.outline)),
+        ]),
       ]),
     );
   }
 }
 
-// ── Stat row ──
 class _StatRow extends StatelessWidget {
   final IconData icon;
   final String label, value;

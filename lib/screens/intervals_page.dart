@@ -1,7 +1,6 @@
 // Intervals.icu: free personal API key → activities, GPS routes and heart rate (no Health Connect consent).
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../app_state.dart';
 import '../services/health_service.dart';
 import '../services/intervals_service.dart';
 import '../widgets/hs_widgets.dart';
