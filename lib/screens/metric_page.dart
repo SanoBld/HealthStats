@@ -1,5 +1,8 @@
 // Detail of a daily metric: day / week / month / year, same smooth chart as the stats.
 import 'package:flutter/material.dart';
+import '../app_state.dart';
+import '../widgets/m3_date_picker.dart';
+import '../widgets/period_picker.dart';
 import '../widgets/charts.dart';
 import '../widgets/health_cards.dart';
 import '../widgets/hs_widgets.dart' show isFr, StatBadge, HighlightCard;
@@ -21,6 +24,16 @@ class MetricPage extends StatefulWidget {
 class _MetricPageState extends State<MetricPage> {
   int _m = 1; // 0 day, 1 week, 2 month, 3 year
   DateTime? _day; // chosen day (day mode)
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month); // month mode
+  int _year = DateTime.now().year; // year mode
+
+  @override
+  void initState() {
+    super.initState();
+    // open on today when it has data, otherwise on the week
+    final t = _d(DateTime.now());
+    _m = widget.series.any((e) => _d(e.$1) == t) ? 0 : 1;
+  }
   static DateTime _d(DateTime x) => DateTime(x.year, x.month, x.day);
   static String _k(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 
@@ -30,22 +43,37 @@ class _MetricPageState extends State<MetricPage> {
   }
 
   Map<String, int> _chart() {
-    final now = _m == 0 ? (_day ?? _d(DateTime.now())) : _d(DateTime.now());
+    final today = _d(DateTime.now());
     final byDay = {for (final e in widget.series) _k(_d(e.$1)): e.$2};
     final out = <String, int>{};
-    if (_m == 3) {
+    if (_m == 3) { // year: one value per month
       final sums = <String, List<double>>{};
       for (final e in widget.series) {
-        if (now.difference(_d(e.$1)).inDays > 365) continue;
+        if (e.$1.year != _year) continue;
         (sums['${e.$1.year}-${e.$1.month.toString().padLeft(2, '0')}'] ??= []).add(e.$2);
       }
       sums.forEach((k, v) => out[k] = (widget.average ? v.reduce((a, b) => a + b) / v.length : v.reduce((a, b) => a + b)).round());
       return out;
     }
-    final n = _m == 0 ? 14 : _m == 1 ? 7 : 30;
+    if (_m == 2) { // month: one value per day of the chosen month
+      final last = DateTime(_month.year, _month.month + 1, 0);
+      final end = last.isAfter(today) ? today : last;
+      for (var d = _month; !d.isAfter(end); d = DateTime(d.year, d.month, d.day + 1)) {
+        final v = byDay[_k(d)];
+        if (v != null) { out[_k(d)] = v.round(); } else if (!widget.average) { out[_k(d)] = 0; }
+      }
+      return out;
+    }
+    final end = _m == 0 ? (_day ?? today) : today;
+    final n = _m == 0 ? 14 : 7;
     for (var i = n - 1; i >= 0; i--) {
-      final d = now.subtract(Duration(days: i)), v = byDay[_k(d)];
+      final d = DateTime(end.year, end.month, end.day - i), v = byDay[_k(d)];
       if (v != null) { out[_k(d)] = v.round(); } else if (!widget.average) { out[_k(d)] = 0; }
+    }
+    if (widget.average && out.length < 2) { // sparse data: show the last recorded days instead of an empty chart
+      out.clear();
+      final l = widget.series.where((e) => !_d(e.$1).isAfter(end)).toList();
+      for (final e in l.skip(l.length > 14 ? l.length - 14 : 0)) { out[_k(_d(e.$1))] = e.$2.round(); }
     }
     return out;
   }
@@ -64,7 +92,7 @@ class _MetricPageState extends State<MetricPage> {
     final avg = vals.isEmpty ? 0.0 : total / vals.length;
     final head = _m == 0 ? today : widget.average ? avg : total.toDouble();
     final cap = [isToday ? (isFr ? 'Aujourd\'hui' : 'Today') : dmy(selDay), isFr ? '7 derniers jours' : 'Last 7 days',
-        isFr ? '30 derniers jours' : 'Last 30 days', isFr ? '12 derniers mois' : 'Last 12 months'][_m];
+        '${monthName(_month.month)} ${_month.year}', '$_year'][_m];
     return Scaffold(
       appBar: AppBar(title: Text(widget.title)),
       body: Column(children: [
@@ -78,6 +106,24 @@ class _MetricPageState extends State<MetricPage> {
         Divider(height: 1, thickness: 1, color: s.outlineVariant.withValues(alpha: 0.3)),
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
+            if (_m == 2) PeriodBar(
+              label: '${monthName(_month.month)} ${_month.year}',
+              onPrev: DateTime(_month.year, _month.month).isAfter(DateTime(first.year, first.month))
+                  ? () => setState(() => _month = DateTime(_month.year, _month.month - 1)) : null,
+              onNext: DateTime(_month.year, _month.month).isBefore(DateTime(DateTime.now().year, DateTime.now().month))
+                  ? () => setState(() => _month = DateTime(_month.year, _month.month + 1)) : null,
+              onPick: () async {
+                final d = await showPeriodPicker(context, initial: _month, first: first, last: DateTime.now());
+                if (d != null) setState(() => _month = d);
+              }),
+            if (_m == 3) PeriodBar(
+              label: '$_year',
+              onPrev: _year > first.year ? () => setState(() => _year--) : null,
+              onNext: _year < DateTime.now().year ? () => setState(() => _year++) : null,
+              onPick: () async {
+                final d = await showPeriodPicker(context, initial: DateTime(_year), first: first, last: DateTime.now(), yearOnly: true);
+                if (d != null) setState(() => _year = d.year);
+              }),
             if (_m == 0) Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(children: [
@@ -86,7 +132,7 @@ class _MetricPageState extends State<MetricPage> {
                 Expanded(child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () async {
-                    final d = await showDatePicker(context: context, initialDate: selDay, firstDate: first, lastDate: _d(DateTime.now()));
+                    final d = await showM3DatePicker(context, initial: selDay, first: first, last: _d(DateTime.now()));
                     if (d != null) setState(() => _day = _d(d));
                   },
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
@@ -108,7 +154,7 @@ class _MetricPageState extends State<MetricPage> {
             if (vals.isNotEmpty) ...[
               HighlightCard(
                 icon: widget.icon, color: widget.color, title: widget.title,
-                sentence: widget.verdict != null
+                sentence: widget.verdict != null && showAdviceNotifier.value
                     ? widget.verdict!(widget.average ? avg : _recent(), isFr)
                     : (isFr ? 'Entre ${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} et ${widget.fmt(vals.reduce((a, b) => a > b ? a : b).toDouble())} ${widget.unit} sur cette période.'
                             : 'Between ${widget.fmt(vals.reduce((a, b) => a < b ? a : b).toDouble())} and ${widget.fmt(vals.reduce((a, b) => a > b ? a : b).toDouble())} ${widget.unit} over this period.'),

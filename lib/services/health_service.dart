@@ -118,7 +118,10 @@ class HealthService extends ChangeNotifier {
       final lite = await _list('sessions', {...a, 'lite': true}, const Duration(seconds: 45));
       final old = {for (final w in workouts) w.id: w};
       final liteWs = lite.map((e) => Workout.fromMap(Map.from(e as Map))).toList();
-      workouts = [for (final w in liteWs) old[w.id] ?? w]..sort((x, y) => y.start.compareTo(x.start));
+      final newIds = {for (final w in liteWs) w.id};
+      // saved activities stay even if Health Connect does not return them any more
+      workouts = [for (final w in liteWs) old[w.id] ?? w, for (final w in old.values) if (!newIds.contains(w.id) && !w.id.startsWith('imp_')) w]
+        ..sort((x, y) => y.start.compareTo(x.start));
       _applyImports();
       stage = _fr ? 'Calcul des statistiques (${workouts.length} activités)…' : 'Computing stats (${workouts.length} activities)…';
       progress = 0.4;
@@ -313,75 +316,111 @@ class HealthService extends ChangeNotifier {
     } catch (_) { return []; }
   }
 
-  /// Values of a metric over [days]: restingHr, hrv, spo2, vo2, resp, bodyFat, systolic, temp.
-  Future<List<(DateTime, double)>> metric(String kind, {int days = kAllDays}) async {
+  // ── Vitals vault: sleep, resting HR, HRV, SpO2, weight are saved on the phone ──
+  // Everything read once stays saved. After that only the newest days are asked
+  // again (at most every 6 hours), and a failed read never erases saved data.
+  final Map<String, List> _vault = {};
+  final Map<String, int> _vaultAt = {};
+  Future<void>? _vaultReady;
+  Future<void> _readVault() async {
+    for (final name in ['hs_vitals.json', 'hs_vitals.json.bak']) {
+      try {
+        final f = await _f(name);
+        if (!await f.exists()) continue;
+        final j = jsonDecode(await f.readAsString()) as Map;
+        (j['rows'] as Map).forEach((k, v) => _vault[k as String] = List.from(v as List));
+        (j['at'] as Map).forEach((k, v) => _vaultAt[k as String] = (v as num).toInt());
+        return;
+      } catch (_) {}
+    }
+  }
+  Future<void> _saveVault() => _writeSafe('hs_vitals.json', jsonEncode({'rows': _vault, 'at': _vaultAt}));
+
+  /// Writes a file without ever leaving it half written (temp file, then rename; old copy kept as .bak).
+  Future<void> _writeSafe(String name, String data) async {
     try {
-      final r = (await _ch.invokeMethod<List>('metric', {'kind': kind,
-              'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
-              'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 40))) ?? [];
-      final per = <DateTime, List<double>>{};
-      for (final e in r) { final l = (e as List).cast<num>();
-        final t = DateTime.fromMillisecondsSinceEpoch(l[0].toInt());
-        (per[DateTime(t.year, t.month, t.day)] ??= []).add(l[1].toDouble()); }
-      return per.entries.map((e) => (e.key, e.value.reduce((a, b) => a + b) / e.value.length)).toList()
-        ..sort((a, b) => a.$1.compareTo(b.$1));
-    } catch (_) { return []; }
+      final f = await _f(name), tmp = await _f('$name.tmp'), bak = await _f('$name.bak');
+      await tmp.writeAsString(data, flush: true);
+      if (await f.exists()) { try { await f.copy(bak.path); } catch (_) {} }
+      await tmp.rename(f.path);
+    } catch (_) {}
   }
 
-  /// All sleep sessions of the whole history (with real stages when the source gives them).
-  Future<List<Map>> sleepRaw({int days = kAllDays}) async {
+  int _rowMs(String key, dynamic e) => key == 'sleep' ? ((e as Map)['end'] as num).toInt() : ((e as List)[0] as num).toInt();
+  String _rowId(String key, dynamic e) => key == 'sleep' ? '${(e as Map)['start']}-${e['end']}' : '${(e as List)[0]}';
+
+  Future<List> _vaultRows(String key, String method, Map<String, dynamic> args) async {
+    await (_vaultReady ??= _readVault());
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final have = _vault[key] ?? [];
+    if (_vault.containsKey(key) && now - (_vaultAt[key] ?? 0) < 6 * 3600000) return have;
+    final since = have.isEmpty
+        ? DateTime.now().subtract(const Duration(days: kAllDays)).millisecondsSinceEpoch
+        : _rowMs(key, have.last) - 3 * 86400000;
     try {
-      final r = (await _ch.invokeMethod<List>('sleep', {
-            'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
-            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 60))) ?? [];
-      return [for (final e in r) Map.from(e as Map)];
-    } catch (_) { return []; }
+      final r = (await _ch.invokeMethod<List>(method, {...args, 'start': since, 'end': now}).timeout(const Duration(seconds: 90))) ?? [];
+      if (r.isEmpty && have.isEmpty) return have;
+      final map = {for (final e in have) _rowId(key, e): e};
+      for (final e in r) {
+        map[_rowId(key, e)] = key == 'sleep' ? Map<String, dynamic>.from((e as Map).map((k, v) => MapEntry(k as String, v)))
+            : [for (final x in (e as List)) (x as num)];
+      }
+      final all = map.values.toList()..sort((a, b) => _rowMs(key, a).compareTo(_rowMs(key, b)));
+      _vault[key] = all; _vaultAt[key] = now;
+      await _saveVault();
+      return all;
+    } catch (_) { return have; } // keep what is already saved
+  }
+
+  /// Daily average of a vital sign (whole history, saved on the phone).
+  Future<List<(DateTime, double)>> metric(String kind, {int days = kAllDays}) async {
+    final r = await _vaultRows('m_$kind', 'metric', {'kind': kind});
+    final from = DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch;
+    final per = <DateTime, List<double>>{};
+    for (final e in r) {
+      final l = (e as List).cast<num>();
+      if (l[0] < from) continue;
+      final t = DateTime.fromMillisecondsSinceEpoch(l[0].toInt());
+      (per[DateTime(t.year, t.month, t.day)] ??= []).add(l[1].toDouble());
+    }
+    return per.entries.map((e) => (e.key, e.value.reduce((a, b) => a + b) / e.value.length)).toList()
+      ..sort((a, b) => a.$1.compareTo(b.$1));
+  }
+
+  /// All sleep sessions (with real stages when the source gives them), saved on the phone.
+  Future<List<Map>> sleepRaw({int days = kAllDays}) async {
+    final r = await _vaultRows('sleep', 'sleep', {});
+    final from = DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch;
+    return [for (final e in r) if (_rowMs('sleep', e) >= from) Map.from(e as Map)];
   }
 
   /// Hours slept per night (whole history), by wake-up day.
   Future<List<(DateTime, double)>> sleepNights({int days = kAllDays}) async {
-    try {
-      final r = await sleepRaw(days: days);
-      final per = <DateTime, double>{};
-      for (final e in r) {
-        final m = e as Map;
-        final a = DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()), b = DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt());
-        final day = DateTime(b.year, b.month, b.day);
-        per[day] = (per[day] ?? 0) + b.difference(a).inMinutes / 60;
-      }
-      return per.entries.map((e) => (e.key, e.value)).toList()..sort((a, b) => a.$1.compareTo(b.$1));
-    } catch (_) { return []; }
+    final per = <DateTime, double>{};
+    for (final m in await sleepRaw(days: days)) {
+      final a = DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()), b = DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt());
+      final day = DateTime(b.year, b.month, b.day);
+      per[day] = (per[day] ?? 0) + b.difference(a).inMinutes / 60;
+    }
+    return per.entries.map((e) => (e.key, e.value)).toList()..sort((a, b) => a.$1.compareTo(b.$1));
   }
 
   /// Last night (sessions grouped): bed time, wake time, minutes asleep.
   Future<({DateTime start, DateTime end, int minutes})?> lastSleep() async {
-    try {
-      final r = (await _ch.invokeMethod<List>('sleep', {
-            'start': DateTime.now().subtract(const Duration(days: 4)).millisecondsSinceEpoch,
-            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
-      final ss = <(DateTime, DateTime)>[];
-      for (final e in r) {
-        final m = e as Map;
-        ss.add((DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()), DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt())));
-      }
-      if (ss.isEmpty) return null;
-      ss.sort((a, b) => b.$2.compareTo(a.$2));
-      final end = ss.first.$2;
-      final g = ss.where((x) => end.difference(x.$2).inHours < 14).toList();
-      final st = g.map((x) => x.$1).reduce((a, b) => a.isBefore(b) ? a : b);
-      return (start: st, end: end, minutes: g.fold<int>(0, (a, x) => a + x.$2.difference(x.$1).inMinutes));
-    } catch (_) { return null; }
+    final r = await sleepRaw(days: 4);
+    final ss = [for (final m in r) (DateTime.fromMillisecondsSinceEpoch((m['start'] as num).toInt()), DateTime.fromMillisecondsSinceEpoch((m['end'] as num).toInt()))];
+    if (ss.isEmpty) return null;
+    ss.sort((a, b) => b.$2.compareTo(a.$2));
+    final end = ss.first.$2;
+    final g = ss.where((x) => end.difference(x.$2).inHours < 14).toList();
+    final st = g.map((x) => x.$1).reduce((a, b) => a.isBefore(b) ? a : b);
+    return (start: st, end: end, minutes: g.fold<int>(0, (a, x) => a + x.$2.difference(x.$1).inMinutes));
   }
 
   Future<List<(DateTime, double)>> weights({int days = kAllDays}) async {
-    try {
-      final r = (await _ch.invokeMethod<List>('weight', {
-            'start': DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch,
-            'end': DateTime.now().millisecondsSinceEpoch}).timeout(const Duration(seconds: 30))) ?? [];
-      return r.map((e) { final l = (e as List).cast<num>();
-        return (DateTime.fromMillisecondsSinceEpoch(l[0].toInt()), l[1].toDouble()); }).toList()
-        ..sort((a, b) => a.$1.compareTo(b.$1));
-    } catch (_) { return []; }
+    final r = await _vaultRows('weight', 'weight', {});
+    final from = DateTime.now().subtract(Duration(days: days)).millisecondsSinceEpoch;
+    return [for (final e in r) if ((e as List)[0] >= from) (DateTime.fromMillisecondsSinceEpoch((e[0] as num).toInt()), (e[1] as num).toDouble())];
   }
 
   // ── Import GPX / FIT ──
@@ -563,7 +602,7 @@ class HealthService extends ChangeNotifier {
   Future<File> _f(String n) async => File('${(await getApplicationSupportDirectory()).path}/$n');
   Future<void> _saveCache() async {
     try {
-      await (await _f('hs_cache.json')).writeAsString(jsonEncode({
+      await _writeSafe('hs_cache.json', jsonEncode({
         'sync': lastSync?.millisecondsSinceEpoch,
         'si': _statsOk.toList(), 'w': workouts.map((w) => w.toMap()).toList(), 'd': days.map((d) => d.toMap()).toList()}));
     } catch (_) {}
@@ -575,8 +614,10 @@ class HealthService extends ChangeNotifier {
     } catch (_) {}
   }
   Future<void> _loadCache() async {
-    try {
-      final f = await _f('hs_cache.json');
+    for (final cname in ['hs_cache.json', 'hs_cache.json.bak']) {
+      if (workouts.isNotEmpty) break;
+      try {
+      final f = await _f(cname);
       if (await f.exists()) {
         final j = jsonDecode(await f.readAsString()) as Map;
         workouts = (j['w'] as List).map((e) => Workout.fromMap(e as Map)).toList();
@@ -585,7 +626,8 @@ class HealthService extends ChangeNotifier {
             : [for (final w in workouts) if (w.distanceM > 0 || w.hrAvg > 0 || w.kcal > 0 || w.steps > 0) w.id]);
         if (j['sync'] != null) lastSync = DateTime.fromMillisecondsSinceEpoch(j['sync'] as int);
       }
-    } catch (_) {}
+      } catch (_) {}
+    }
     try {
       final f = await _f('hs_imports.json');
       if (await f.exists()) {
@@ -607,7 +649,7 @@ class HealthService extends ChangeNotifier {
   /// Size of the local cache in bytes (shown before the user clears it).
   Future<int> cacheSize() async {
     var n = 0;
-    for (final name in ['hs_cache.json', 'hs_tracks.json']) {
+    for (final name in ['hs_cache.json', 'hs_tracks.json', 'hs_vitals.json']) {
       try { final f = await _f(name); if (await f.exists()) n += await f.length(); } catch (_) {}
     }
     return n;
@@ -634,7 +676,8 @@ class HealthService extends ChangeNotifier {
   /// Only call this after the user confirmed (see confirmClearCache).
   Future<void> clearCache() async {
     workouts = []; days = []; _routes.clear(); _statsOk.clear(); tracks.clear(); _noTrack.clear(); lastSync = null;
-    for (final name in ['hs_cache.json', 'hs_tracks.json']) {
+    _vault.clear(); _vaultAt.clear();
+    for (final name in ['hs_cache.json', 'hs_cache.json.bak', 'hs_tracks.json', 'hs_vitals.json', 'hs_vitals.json.bak']) {
       try { await (await _f(name)).delete(); } catch (_) {}
     }
     notifyListeners();

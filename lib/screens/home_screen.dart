@@ -22,9 +22,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _idx = 0;
   @override
-  void initState() { super.initState(); localeNotifier.addListener(_r); WidgetsBinding.instance.addObserver(this); }
+  void initState() { super.initState(); localeNotifier.addListener(_r); hiddenTabsNotifier.addListener(_r); WidgetsBinding.instance.addObserver(this); }
   @override
-  void dispose() { WidgetsBinding.instance.removeObserver(this); localeNotifier.removeListener(_r); super.dispose(); }
+  void dispose() { WidgetsBinding.instance.removeObserver(this); localeNotifier.removeListener(_r); hiddenTabsNotifier.removeListener(_r); super.dispose(); }
   // Fresh steps when you come back to the app (at most every 5 min)
   @override
   void didChangeAppLifecycleState(AppLifecycleState st) {
@@ -35,34 +35,47 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         (hs.lastSync == null || DateTime.now().difference(hs.lastSync!).inMinutes >= 5)) { hs.sync(); }
   }
   void _r() => setState(() {});
+  // index in the full tab list (0 dash, 1 activities, 2 map, 3 search, 4 charts) -> index of the visible tabs
+  int _visIndex(int full) {
+    const keys = ['dash', 'activities', 'map', 'search', 'charts'];
+    final vis = [for (final k in keys) if (k == 'dash' || !isHidden(hiddenTabsNotifier, k)) k];
+    final i = vis.indexOf(keys[full.clamp(0, 4)]);
+    return i < 0 ? 0 : i;
+  }
 
   @override
   Widget build(BuildContext context) {
     final bg = Theme.of(context).colorScheme.surface;
-    final pages = [
-      DashboardPage(onOpenTab: (i) => setState(() => _idx = i)),
-      const ActivitiesPage(), const MapPage(), const SearchPage(), const ChartsPage(),
-    ].map((p) => ClipRect(child: ColoredBox(color: bg, child: p))).toList();
+    // (key, page, destination); the dashboard is always there, the others can be hidden in settings
+    final all = <(String, Widget, NavigationDestination)>[
+      ('dash', DashboardPage(onOpenTab: (i) => setState(() => _idx = _visIndex(i))),
+          NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard_rounded), label: L.navDashboard)),
+      ('activities', const ActivitiesPage(),
+          NavigationDestination(icon: const Icon(Icons.fitness_center_outlined), selectedIcon: const Icon(Icons.fitness_center_rounded), label: L.navActivities)),
+      ('map', const MapPage(),
+          NavigationDestination(icon: const Icon(Icons.map_outlined), selectedIcon: const Icon(Icons.map_rounded), label: L.navMap)),
+      ('search', const SearchPage(),
+          NavigationDestination(icon: const Icon(Icons.search_rounded), selectedIcon: const Icon(Icons.search_rounded), label: isFr ? 'Recherche' : 'Search')),
+      ('charts', const ChartsPage(),
+          NavigationDestination(icon: const Icon(Icons.auto_graph_outlined), selectedIcon: const Icon(Icons.auto_graph_rounded), label: L.navCharts)),
+    ];
+    final vis = [for (final e in all) if (e.$1 == 'dash' || !isHidden(hiddenTabsNotifier, e.$1)) e];
+    final idx = _idx.clamp(0, vis.length - 1);
+    final pages = [for (final e in vis) ClipRect(child: ColoredBox(color: bg, child: e.$2))];
     return Scaffold(
       body: ScrollStatusBarHost(
         color: bg,
-        resetToken: _idx,
+        resetToken: idx,
         threshold: 0,
-        child: M3FadeThroughStack(index: _idx, children: pages),
+        child: M3FadeThroughStack(index: idx, children: pages),
       ),
       bottomNavigationBar: NavigationBar(
-        selectedIndex: _idx,
+        selectedIndex: idx,
         onDestinationSelected: (i) {
           if (hapticFeedbackNotifier.value) HapticFeedback.selectionClick();
           setState(() => _idx = i);
         },
-        destinations: [
-          NavigationDestination(icon: const Icon(Icons.dashboard_outlined), selectedIcon: const Icon(Icons.dashboard_rounded), label: L.navDashboard),
-          NavigationDestination(icon: const Icon(Icons.fitness_center_outlined), selectedIcon: const Icon(Icons.fitness_center_rounded), label: L.navActivities),
-          NavigationDestination(icon: const Icon(Icons.map_outlined), selectedIcon: const Icon(Icons.map_rounded), label: L.navMap),
-          NavigationDestination(icon: const Icon(Icons.search_rounded), selectedIcon: const Icon(Icons.search_rounded), label: isFr ? 'Recherche' : 'Search'),
-          NavigationDestination(icon: const Icon(Icons.auto_graph_outlined), selectedIcon: const Icon(Icons.auto_graph_rounded), label: L.navCharts),
-        ],
+        destinations: [for (final e in vis) e.$3],
       ),
     );
   }

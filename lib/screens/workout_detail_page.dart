@@ -214,13 +214,15 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
         if (alts.length > 1) ...[
           SectionTitle(isFr ? 'Altitude' : 'Elevation'),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
-              values: alts, color: col, unit: 'm', onScrub: _routeCursor)),
+              values: alts, color: col, unit: 'm',
+              labelOf: (i) => _clock(Duration(seconds: (w.duration.inSeconds * i / (alts.length - 1)).round())), onScrub: _routeCursor)),
         ],
         if (speeds.length > 1) ...[
           SectionTitle(isFr ? 'Vitesse' : 'Speed'),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
               values: speeds, color: col, unit: spdUnit, decimals: 1,
-              labelOf: recSpeed ? (i) => _clock(_spd[i].$1.difference(w.start)) : null,
+              labelOf: recSpeed ? (i) => _clock(_spd[i].$1.difference(w.start))
+                  : (i) => _clock(Duration(seconds: (w.duration.inSeconds * i / (speeds.length - 1)).round())),
               onScrub: recSpeed ? (f) => _timeCursor(_spd, f) : _routeCursor)),
         ],
         if (_pow.length <= 5 && !w.id.startsWith('imp_') && (w.type == 8 || w.type == 9)) PermPrompt(perm: 'READ_POWER', icon: Icons.bolt_rounded, onGranted: _load,

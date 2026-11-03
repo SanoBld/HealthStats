@@ -55,7 +55,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext ctx) {
     final hs = HealthService.instance;
     return ListenableBuilder(
-      listenable: Listenable.merge([hs, profileNameNotifier, stepGoalNotifier, weeklyGoalNotifier, unitsMetricNotifier, localeNotifier, sportColorsNotifier]),
+      listenable: Listenable.merge([hs, profileNameNotifier, stepGoalNotifier, weeklyGoalNotifier, unitsMetricNotifier, localeNotifier, sportColorsNotifier, hiddenCardsNotifier]),
       builder: (ctx, _) {
         final s = Theme.of(ctx).colorScheme, t = Theme.of(ctx).textTheme;
         final today = hs.dayStat(DateTime.now());
@@ -133,7 +133,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
 
             // ── sleep ──
-            if (_night != null || _sleep.isNotEmpty) HealthCard(
+            if (!isHidden(hiddenCardsNotifier, 'sleep') && (_night != null || _sleep.isNotEmpty)) HealthCard(
               icon: Icons.bedtime_rounded, title: isFr ? 'Sommeil' : 'Sleep', color: violet,
               trailing: _night == null ? null : fmtDay(_night!.end),
               onTap: _sleep.isEmpty ? null : () => _push(SleepDetailPage(nights: _sleep)),
@@ -161,7 +161,7 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
 
             // ── heart ──
-            if (_rhr.isNotEmpty || hs.days.any((d) => d.hrAvg > 0)) Builder(builder: (_) {
+            if (!isHidden(hiddenCardsNotifier, 'heart') && (_rhr.isNotEmpty || hs.days.any((d) => d.hrAvg > 0))) Builder(builder: (_) {
               final series = _rhr.isNotEmpty ? _rhr : [for (final d in hs.days) if (d.hrAvg > 0) (d.day, d.hrAvg)];
               final last = series.last.$2;
               return HealthCard(
@@ -190,7 +190,7 @@ class _DashboardPageState extends State<DashboardPage> {
             }),
 
             // ── other vitals (2 per row) ──
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Wrap(spacing: 12, runSpacing: 12, children: [
+            if (!isHidden(hiddenCardsNotifier, 'vitals')) Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Wrap(spacing: 12, runSpacing: 12, children: [
               for (final m in [
                 ('HRV', 'ms', Icons.monitor_heart_rounded, green, _hrv, 0),
                 ('SpO₂', '%', Icons.air_rounded, blue, _spo2, 0),
@@ -209,6 +209,7 @@ class _DashboardPageState extends State<DashboardPage> {
             if (hs.workouts.isEmpty) Padding(padding: const EdgeInsets.all(20), child: Text(isFr ? 'Aucune séance synchronisée.' : 'No workout synced yet.'))
             else for (final w in hs.workouts.take(4)) WorkoutCard(w: w, onTap: () => open(w)),
 
+            if (!isHidden(hiddenCardsNotifier, 'week')) ...[
             SectionTitle(isFr ? 'Cette semaine' : 'This week'),
             StatGrid([
               StatTile(icon: Icons.event_available_rounded, value: '${week.length}/${weeklyGoalNotifier.value}', label: isFr ? 'Séances' : 'Workouts'),
@@ -216,6 +217,7 @@ class _DashboardPageState extends State<DashboardPage> {
               StatTile(icon: Icons.route_rounded, value: distLabel(week.fold(0.0, (a, w) => a + w.distanceM)), label: 'Distance'),
               StatTile(icon: Icons.local_fire_department_rounded, value: '${week.fold(0.0, (a, w) => a + w.kcal).round()}', label: 'kcal'),
             ]),
+            ],
           ]),
         ));
       },

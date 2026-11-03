@@ -6,6 +6,8 @@ import '../services/health_service.dart';
 import '../widgets/health_cards.dart';
 import '../widgets/hs_widgets.dart';
 import '../widgets/m3_components.dart' show M3SegmentedButton;
+import '../widgets/m3_date_picker.dart';
+import '../widgets/period_picker.dart';
 
 class SleepDetailPage extends StatefulWidget {
   final List<(DateTime, double)> nights; // hours per night
@@ -15,7 +17,9 @@ class SleepDetailPage extends StatefulWidget {
 }
 
 class _SleepDetailPageState extends State<SleepDetailPage> {
-  int _m = 1; // 0 = night, 1 = week, 2 = month
+  int _m = 0; // 0 = night, 1 = week, 2 = month, 3 = year
+  DateTime _month = DateTime(DateTime.now().year, DateTime.now().month);
+  int _year = DateTime.now().year;
   List<_SleepNight> _details = [];
   bool _loaded = false;
   DateTime? _day; // chosen wake-up day (null = latest)
@@ -110,8 +114,10 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
     final selI = selDay == null ? -1 : nights.indexWhere((e) => same(e.$1, selDay));
     final selHours = selI < 0 ? 0.0 : nights[selI].$2;
     final lastNight = selDay == null ? null : _details.where((d) => same(d.end, selDay)).firstOrNull;
-    final winDays = _m == 1 ? 7 : 30;
-    final win = [for (final e in nights) if (DateTime.now().difference(e.$1).inDays < winDays) e];
+    bool inWin(DateTime d) => _m == 1
+        ? DateTime.now().difference(d).inDays < 7
+        : _m == 2 ? d.year == _month.year && d.month == _month.month : d.year == _year;
+    final win = [for (final e in nights) if (inWin(e.$1)) e];
     final avgW = win.isEmpty ? 0.0 : win.fold(0.0, (a, e) => a + e.$2) / win.length;
     String dmy(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 
@@ -127,9 +133,16 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
         }
         return out;
       }
-      final n = _m == 1 ? 7 : 30;
+      if (_m == 3) { // year: average per month
+        for (var mo = 1; mo <= 12; mo++) {
+          final l = [for (final e in nights) if (e.$1.year == _year && e.$1.month == mo) e.$2];
+          if (l.isNotEmpty) out['${mo.toString().padLeft(2, '0')}/${(_year % 100).toString().padLeft(2, '0')}'] = (l.reduce((a, b) => a + b) / l.length * 60).round();
+        }
+        return out;
+      }
+      final n = _m == 1 ? 7 : DateTime(_month.year, _month.month + 1, 0).day;
       for (var i = n - 1; i >= 0; i--) {
-        final d = DateTime(now.year, now.month, now.day).subtract(Duration(days: i));
+        final d = _m == 1 ? DateTime(now.year, now.month, now.day).subtract(Duration(days: i)) : DateTime(_month.year, _month.month, n - i);
         final k = '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
         final found = nights.where((e) =>
             e.$1.year == d.year && e.$1.month == d.month && e.$1.day == d.day);
@@ -149,6 +162,7 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
                 isFr ? 'Nuit' : 'Night',
                 isFr ? 'Semaine' : 'Week',
                 isFr ? 'Mois' : 'Month',
+                isFr ? 'Année' : 'Year',
               ].indexed)
                 ButtonSegment(value: i, label: Text(l)),
             ],
@@ -160,29 +174,55 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
         Expanded(
           child: ListView(padding: const EdgeInsets.fromLTRB(16, 14, 16, 32), children: [
             // ── Day navigator (night mode) ──
-            if (_m == 0 && selI >= 0) Padding(
+            if (_m == 0 && selDay != null) Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: Row(children: [
                 IconButton(
-                  onPressed: selI > 0 ? () => setState(() => _day = nights[selI - 1].$1) : null,
+                  onPressed: nights.any((e) => e.$1.isBefore(selDay))
+                      ? () => setState(() => _day = nights.lastWhere((e) => e.$1.isBefore(selDay)).$1) : null,
                   icon: const Icon(Icons.chevron_left_rounded)),
                 Expanded(child: InkWell(
                   borderRadius: BorderRadius.circular(16),
                   onTap: () async {
-                    final d = await showDatePicker(
-                      context: context, initialDate: nights[selI].$1,
-                      firstDate: nights.first.$1, lastDate: nights.last.$1,
-                      selectableDayPredicate: (x) => nights.any((e) => same(e.$1, x)));
+                    final d = await showM3DatePicker(context, initial: selDay, first: nights.first.$1, last: nights.last.$1);
                     if (d != null) setState(() => _day = d);
                   },
                   child: Padding(padding: const EdgeInsets.symmetric(vertical: 10),
-                    child: Center(child: Text(dmy(nights[selI].$1), style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)))),
+                    child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                      const Icon(Icons.calendar_month_rounded, size: 18), const SizedBox(width: 8),
+                      Text(dmy(selDay), style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+                    ])),
                 )),
                 IconButton(
-                  onPressed: selI < nights.length - 1 ? () => setState(() => _day = nights[selI + 1].$1) : null,
+                  onPressed: nights.any((e) => e.$1.isAfter(selDay))
+                      ? () => setState(() => _day = nights.firstWhere((e) => e.$1.isAfter(selDay)).$1) : null,
                   icon: const Icon(Icons.chevron_right_rounded)),
               ]),
             ),
+            if (_m == 0 && selI < 0 && selDay != null) Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Text(isFr ? 'Pas de données de sommeil pour ce jour.' : 'No sleep data for this day.',
+                  style: t.bodyMedium?.copyWith(color: s.onSurfaceVariant)),
+            ),
+            // ── Month / year chooser ──
+            if (_m == 2 && nights.isNotEmpty) PeriodBar(
+              label: '${monthName(_month.month)} ${_month.year}',
+              onPrev: DateTime(_month.year, _month.month).isAfter(DateTime(nights.first.$1.year, nights.first.$1.month))
+                  ? () => setState(() => _month = DateTime(_month.year, _month.month - 1)) : null,
+              onNext: DateTime(_month.year, _month.month).isBefore(DateTime(now.year, now.month))
+                  ? () => setState(() => _month = DateTime(_month.year, _month.month + 1)) : null,
+              onPick: () async {
+                final d = await showPeriodPicker(context, initial: _month, first: nights.first.$1, last: now);
+                if (d != null) setState(() => _month = d);
+              }),
+            if (_m == 3 && nights.isNotEmpty) PeriodBar(
+              label: '$_year',
+              onPrev: _year > nights.first.$1.year ? () => setState(() => _year--) : null,
+              onNext: _year < now.year ? () => setState(() => _year++) : null,
+              onPick: () async {
+                final d = await showPeriodPicker(context, initial: DateTime(_year), first: nights.first.$1, last: now, yearOnly: true);
+                if (d != null) setState(() => _year = d.year);
+              }),
             // ── Summary card ──
             Container(
               padding: const EdgeInsets.all(18),
@@ -214,11 +254,13 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
               _sleepQuality(_m == 0 ? selHours : avgW),
               style: t.titleMedium?.copyWith(fontWeight: FontWeight.w700),
             ),
-            const SizedBox(height: 4),
-            Text(
-              _sleepAdvice(_m == 0 ? selHours : avgW),
-              style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
-            ),
+            if (showAdviceNotifier.value) ...[
+              const SizedBox(height: 4),
+              Text(
+                _sleepAdvice(_m == 0 ? selHours : avgW),
+                style: t.bodySmall?.copyWith(color: s.onSurfaceVariant),
+              ),
+            ],
           ]),
         ),
         const SizedBox(height: 16),

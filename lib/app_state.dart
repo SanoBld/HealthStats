@@ -25,6 +25,16 @@ final weeklyGoalNotifier       = ValueNotifier<int>(3);      // séances/semaine
 final unitsMetricNotifier      = ValueNotifier<bool>(true);
 final onboardedNotifier        = ValueNotifier<bool>(false);
 final sportColorsNotifier      = ValueNotifier<bool>(true);  // one colour per sport (off = accent only)
+final showAdviceNotifier       = ValueNotifier<bool>(true);  // advice / verdict sentences
+final hiddenTabsNotifier       = ValueNotifier<String>('');  // comma list: activities,map,search,charts
+final hiddenCardsNotifier      = ValueNotifier<String>('');  // comma list: sleep,heart,vitals,week
+
+bool isHidden(ValueNotifier<String> n, String k) => n.value.split(',').contains(k);
+void setHidden(ValueNotifier<String> n, String k, bool hide) {
+  final l = n.value.split(',').where((e) => e.isNotEmpty && e != k).toList();
+  if (hide) l.add(k);
+  n.value = l.join(',');
+}
 
 Future<void> loadAppState() async {
   final p = await SharedPreferences.getInstance();
@@ -46,6 +56,9 @@ Future<void> loadAppState() async {
   unitsMetricNotifier.value = p.getBool('hs_metric') ?? true;
   onboardedNotifier.value = p.getBool('hs_onboarded') ?? false;
   sportColorsNotifier.value = p.getBool('hs_sportcolors') ?? true;
+  showAdviceNotifier.value = p.getBool('hs_advice') ?? true;
+  hiddenTabsNotifier.value = p.getString('hs_hidtabs') ?? '';
+  hiddenCardsNotifier.value = p.getString('hs_hidcards') ?? '';
 }
 
 /// Binds every notifier to SharedPreferences (automatic write).
@@ -69,4 +82,5 @@ void bindPersistence(SharedPreferences p) {
   b(weeklyGoalNotifier, 'hs_weeklygoal'); b(unitsMetricNotifier, 'hs_metric');
   b(onboardedNotifier, 'hs_onboarded');
   b(sportColorsNotifier, 'hs_sportcolors');
+  b(showAdviceNotifier, 'hs_advice'); b(hiddenTabsNotifier, 'hs_hidtabs'); b(hiddenCardsNotifier, 'hs_hidcards');
 }

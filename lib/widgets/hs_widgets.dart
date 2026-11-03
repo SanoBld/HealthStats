@@ -457,14 +457,14 @@ class _ScrubPainter extends CustomPainter {
     var lo = v.reduce(math.min), hi = v.reduce(math.max);
     if (hi - lo < 1) { hi = lo + 1; }
     final pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
-    const top = 28.0, bottom = 6.0;
+    final top = 28.0, bottom = labelOf == null ? 6.0 : 22.0;
     final w = size.width - _kPad - 8, h = size.height - top - bottom;
     double xAt(int i) => _kPad + w * i / (n - 1);
     double yAt(double val) => top + h * (1 - (val - lo) / (hi - lo));
     for (var k = 0; k < 3; k++) {
       final val = hi - (hi - lo) * k / 2, y = yAt(val);
       c.drawLine(Offset(_kPad, y), Offset(size.width, y), Paint()..color = grid.withValues(alpha: 0.45)..strokeWidth = 1);
-      final tp = TextPainter(text: TextSpan(text: val.round().toString(), style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.w600)),
+      final tp = TextPainter(text: TextSpan(text: val.toStringAsFixed(decimals), style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.w600)),
           textDirection: TextDirection.ltr)..layout();
       tp.paint(c, Offset(_kPad - 6 - tp.width, y - tp.height / 2));
     }
@@ -483,6 +483,14 @@ class _ScrubPainter extends CustomPainter {
     c.drawPath(path, Paint()..style = PaintingStyle.stroke..strokeWidth = 3.5..strokeCap = StrokeCap.round..strokeJoin = StrokeJoin.round
       ..shader = LinearGradient(colors: [color, accent]).createShader(Rect.fromLTWH(_kPad, top, w, h)));
     c.restore();
+    // horizontal axis: first, middle and last label
+    if (labelOf != null) {
+      for (final i in {0, (n - 1) ~/ 2, n - 1}) {
+        final tp = TextPainter(text: TextSpan(text: labelOf!(start + (i * step).round()), style: TextStyle(color: text, fontSize: 9, fontWeight: FontWeight.w600)),
+            textDirection: TextDirection.ltr)..layout();
+        tp.paint(c, Offset((pts[i].dx - tp.width / 2).clamp(0.0, size.width - tp.width).toDouble(), top + h + 6));
+      }
+    }
     final fi = f;
     if (fi != null) {
       final i = (fi * (n - 1)).round().clamp(0, n - 1);

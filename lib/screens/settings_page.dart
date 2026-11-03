@@ -75,6 +75,7 @@ final Listenable _watch = Listenable.merge([
   textScaleNotifier, localeNotifier, unitsMetricNotifier, stepGoalNotifier, weeklyGoalNotifier,
   profileNameNotifier, profileBirthNotifier, accentNotifier, useDynamicColorNotifier, appFontNotifier,
   profileHeightNotifier, profileWeightNotifier, profileSexNotifier, sportColorsNotifier,
+  showAdviceNotifier, hiddenTabsNotifier, hiddenCardsNotifier,
 ]);
 
 class _SubPage extends StatelessWidget {
@@ -205,6 +206,24 @@ List<Widget> _appearanceRows(BuildContext ctx) => [
         ),
         SettingSwitchRow(icon: Icons.brightness_2_rounded, title: 'OLED', value: oledModeNotifier.value, onChanged: (v) => oledModeNotifier.value = v),
         SettingSwitchRow(icon: Icons.palette_outlined, title: isFr ? 'Couleurs par sport' : 'Sport colors', value: sportColorsNotifier.value, onChanged: (v) => sportColorsNotifier.value = v),
+      ]),
+      SettingsSection(label: isFr ? 'Affichage' : 'Display', children: [
+        SettingSwitchRow(icon: Icons.lightbulb_outline_rounded, title: isFr ? 'Afficher les conseils' : 'Show advice',
+            value: showAdviceNotifier.value, onChanged: (v) => showAdviceNotifier.value = v),
+        for (final e in [
+          ('activities', Icons.fitness_center_rounded, isFr ? 'Onglet Activités' : 'Activities tab'),
+          ('map', Icons.map_rounded, isFr ? 'Onglet Carte' : 'Map tab'),
+          ('search', Icons.search_rounded, isFr ? 'Onglet Recherche' : 'Search tab'),
+          ('charts', Icons.auto_graph_rounded, isFr ? 'Onglet Graphiques' : 'Charts tab'),
+        ]) SettingSwitchRow(icon: e.$2, title: e.$3, value: !isHidden(hiddenTabsNotifier, e.$1),
+            onChanged: (v) => setHidden(hiddenTabsNotifier, e.$1, !v)),
+        for (final e in [
+          ('sleep', Icons.bedtime_rounded, isFr ? 'Carte Sommeil' : 'Sleep card'),
+          ('heart', Icons.favorite_rounded, isFr ? 'Carte Fréquence cardiaque' : 'Heart rate card'),
+          ('vitals', Icons.monitor_heart_rounded, isFr ? 'HRV, SpO₂ et poids' : 'HRV, SpO₂ and weight'),
+          ('week', Icons.date_range_rounded, isFr ? 'Section Cette semaine' : 'This week section'),
+        ]) SettingSwitchRow(icon: e.$2, title: e.$3, value: !isHidden(hiddenCardsNotifier, e.$1),
+            onChanged: (v) => setHidden(hiddenCardsNotifier, e.$1, !v)),
       ]),
       SettingsSection(label: isFr ? 'Texte' : 'Text', children: [
         SettingChoiceRow(icon: Icons.font_download_rounded, title: isFr ? 'Police' : 'Font', previewFonts: true,
