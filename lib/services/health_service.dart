@@ -40,6 +40,9 @@ class HealthService extends ChangeNotifier {
   int get importCount => _imports.length;
   final Map<String, List<String>> _alt = {}; // merged duplicates: main id -> other ids
   final Set<String> _statsOk = {}; // sessions whose stats are already saved
+  final Set<String> _hrGeneral = {};      // sessions whose heart rate comes from the phone's general heart-rate data
+  final Map<String, int> _hrChecked = {}; // session id -> last time we looked for general heart rate (ms)
+  bool hrIsGeneral(Workout w) => _hrGeneral.contains(w.id);
   Set<String> grantedPerms = {};
   bool get hasRoutePerm => grantedPerms.any((p) => p.endsWith('READ_EXERCISE_ROUTE'));
   /// Is a Health Connect permission granted? [name] = end of the permission, e.g. 'READ_POWER'.
@@ -177,6 +180,7 @@ class HealthService extends ChangeNotifier {
       await _saveCache();
       IntervalsService.credentials().then((c) { if (c != null) syncIntervals(days: 30); });
       _fillHeight();
+      fillMissingHr();
       loadAppInfo();
       // small route previews for the activity list (newest first, in the background)
       loadTracks([for (final w in workouts) if (w.hasRoute) w].take(60).toList());
@@ -294,7 +298,44 @@ class HealthService extends ChangeNotifier {
     final imp = _impHr[w.id];
     if (imp != null && w.id.startsWith('imp_')) return imp;
     final r = await _heartRateHc(w);
+    if (r.isNotEmpty && _applyHr(w, r)) { notifyListeners(); _saveCache(); }
     return r.isEmpty && imp != null ? imp : r;
+  }
+
+  /// A session without heart-rate stats takes them from the heart-rate samples recorded by the phone / watch
+  /// during the session (even when another app wrote them). Returns true when the session was updated.
+  bool _applyHr(Workout w, List<(DateTime, int)> samples) {
+    if (w.hrAvg > 0) return false;
+    final v = [for (final e in samples) if (e.$2 >= 30 && e.$2 <= 230) e.$2];
+    if (v.length < 3) return false;
+    final i = workouts.indexWhere((x) => x.id == w.id);
+    if (i < 0) return false;
+    final avg = v.fold<int>(0, (a, b) => a + b) / v.length;
+    workouts[i] = Workout.fromMap({...workouts[i].toMap(),
+      'hrAvg': avg, 'hrMax': v.reduce((a, b) => a > b ? a : b).toDouble(), 'hrMin': v.reduce((a, b) => a < b ? a : b).toDouble()});
+    _hrGeneral.add(w.id);
+    return true;
+  }
+
+  /// Now and then: looks for heart rate in the sessions that have none. New sessions are retried for 3 days
+  /// (the watch can sync late), older ones are checked once.
+  Future<void> fillMissingHr({int max = 40}) async {
+    if (!permitted || !hasPerm('READ_HEART_RATE')) return;
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final todo = [for (final w in workouts)
+      if (w.hrAvg <= 0 && !w.id.startsWith('imp_') && w.duration.inMinutes >= 3) w].where((w) {
+        final last = _hrChecked[w.id];
+        if (last == null) return true;
+        final recent = DateTime.now().difference(w.end).inDays < 3;
+        return recent && now - last > 3 * 3600 * 1000;
+      }).take(max).toList();
+    var changed = false;
+    for (final w in todo) {
+      final r = await _heartRateHc(w);
+      _hrChecked[w.id] = now;
+      if (_applyHr(w, r)) changed = true;
+    }
+    if (todo.isNotEmpty) { if (changed) notifyListeners(); await _saveCache(); }
   }
 
   Future<List<(DateTime, int)>> _heartRateHc(Workout w) async {
@@ -604,7 +645,7 @@ class HealthService extends ChangeNotifier {
     try {
       await _writeSafe('hs_cache.json', jsonEncode({
         'sync': lastSync?.millisecondsSinceEpoch,
-        'si': _statsOk.toList(), 'w': workouts.map((w) => w.toMap()).toList(), 'd': days.map((d) => d.toMap()).toList()}));
+        'si': _statsOk.toList(), 'hg': _hrGeneral.toList(), 'hc': _hrChecked, 'w': workouts.map((w) => w.toMap()).toList(), 'd': days.map((d) => d.toMap()).toList()}));
     } catch (_) {}
   }
   Future<void> _saveTracks() async {
@@ -624,6 +665,8 @@ class HealthService extends ChangeNotifier {
         days = (j['d'] as List).map((e) => DayStat.fromMap(e as Map)).toList();
         _statsOk.addAll(j['si'] != null ? (j['si'] as List).cast<String>()
             : [for (final w in workouts) if (w.distanceM > 0 || w.hrAvg > 0 || w.kcal > 0 || w.steps > 0) w.id]);
+        if (j['hg'] != null) _hrGeneral.addAll((j['hg'] as List).cast<String>());
+        if (j['hc'] != null) (j['hc'] as Map).forEach((k, v) => _hrChecked[k as String] = (v as num).toInt());
         if (j['sync'] != null) lastSync = DateTime.fromMillisecondsSinceEpoch(j['sync'] as int);
       }
       } catch (_) {}
@@ -668,14 +711,14 @@ class HealthService extends ChangeNotifier {
   }
 
   Future<void> clearActivities() async {
-    workouts = []; days = []; _routes.clear(); _statsOk.clear(); lastSync = null;
+    workouts = []; days = []; _routes.clear(); _statsOk.clear(); _hrGeneral.clear(); _hrChecked.clear(); lastSync = null;
     try { await (await _f('hs_cache.json')).delete(); } catch (_) {}
     notifyListeners();
   }
 
   /// Only call this after the user confirmed (see confirmClearCache).
   Future<void> clearCache() async {
-    workouts = []; days = []; _routes.clear(); _statsOk.clear(); tracks.clear(); _noTrack.clear(); lastSync = null;
+    workouts = []; days = []; _routes.clear(); _statsOk.clear(); _hrGeneral.clear(); _hrChecked.clear(); tracks.clear(); _noTrack.clear(); lastSync = null;
     _vault.clear(); _vaultAt.clear();
     for (final name in ['hs_cache.json', 'hs_cache.json.bak', 'hs_tracks.json', 'hs_vitals.json', 'hs_vitals.json.bak']) {
       try { await (await _f(name)).delete(); } catch (_) {}

@@ -153,6 +153,7 @@ extension _WorkoutCharts on _ChartsPageState {
     final kcal = sorted.where((w) => w.kcal > 0).toList();
     final hr = sorted.where((w) => w.hrAvg > 0).toList();
     final dist = sorted.where((w) => w.distanceM > 100).toList();
+    final eff = sorted.where((w) => w.speedKmh != null && w.hrAvg > 60 && w.distanceM >= 1000 && w.type != 8 && w.type != 9).toList();
     String lab(Workout w) => '${_lab(w.start)} · ${sportName(w.sport)}';
     Widget chart(String title, List<double> v, String unit, String Function(int) l, {int dec = 0}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle(title),
@@ -163,6 +164,8 @@ extension _WorkoutCharts on _ChartsPageState {
     return [
       if (pace.length > 1) chart(isFr ? 'Allure par séance (min/km)' : 'Pace per workout (min/km)', [for (final w in pace) w.paceMinKm!], 'min/km', (i) => lab(pace[i]), dec: 1),
       if (dist.length > 1) chart(isFr ? 'Distance par séance' : 'Distance per workout', [for (final w in dist) w.distanceM / 1000], 'km', (i) => lab(dist[i]), dec: 1),
+      if (eff.length > 1) chart(isFr ? 'Efficacité aérobie (vitesse ÷ FC, plus haut = mieux)' : 'Aerobic efficiency (speed ÷ HR, higher is better)',
+          [for (final w in eff) w.speedKmh! * 1000 / 60 / w.hrAvg * 100], '', (i) => lab(eff[i]), dec: 1),
       if (kcal.length > 1) chart(isFr ? 'Calories par séance' : 'Calories per workout', [for (final w in kcal) w.kcal], 'kcal', (i) => lab(kcal[i])),
       if (hr.length > 1) chart(isFr ? 'Intensité : FC moyenne par séance' : 'Intensity: average heart rate per workout', [for (final w in hr) w.hrAvg], 'bpm', (i) => lab(hr[i])),
       if (totalKcal > 0) Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 0), child: Row(children: [

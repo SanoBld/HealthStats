@@ -272,18 +272,19 @@ class DashReadiness extends StatelessWidget {
     if (rr != null) parts.add((isFr ? 'FC repos' : 'Resting HR', (70 - (rr - 1) * 300).clamp(0, 100).toDouble(), '${rr >= 1 ? '+' : ''}${((rr - 1) * 100).round()} %'));
     if (parts.length < 2) return const SizedBox.shrink();
     final score = (parts.fold<double>(0, (a, e) => a + e.$2) / parts.length).round();
-    final sentence = score >= 80
-        ? (isFr ? 'Très bonne forme : tes indicateurs sont au-dessus de ton habitude.' : 'Great shape: your indicators are above your usual.')
-        : score >= 60
-            ? (isFr ? 'Bonne forme : tout est dans ton rythme habituel.' : 'Good shape: everything is in your usual range.')
-            : score >= 40
-                ? (isFr ? 'Forme moyenne : privilégie une séance légère et un bon sommeil.' : 'Average shape: favor an easy session and good sleep.')
+    final band = score >= 85 ? (isFr ? 'Optimale' : 'Optimal') : score >= 70 ? (isFr ? 'Bonne' : 'Good') : (isFr ? 'À surveiller' : 'Pay attention');
+    final sentence = score >= 85
+        ? (isFr ? 'Tes indicateurs sont au-dessus de ton habitude : bon moment pour une séance exigeante.' : 'Your indicators are above your usual: a good time for a hard session.')
+        : score >= 70
+            ? (isFr ? 'Tout est dans ton rythme habituel.' : 'Everything is in your usual range.')
+            : score >= 50
+                ? (isFr ? 'Un peu en retrait : privilégie une séance légère et un bon sommeil.' : 'A bit down: favor an easy session and good sleep.')
                 : (isFr ? 'Récupération incomplète : un jour de repos serait bienvenu.' : 'Incomplete recovery: a rest day would help.');
     return HealthCard(
       icon: Icons.bolt_rounded, title: isFr ? 'Forme du jour' : 'Readiness', color: color,
-      trailing: isFr ? 'estimation' : 'estimate',
+      trailing: band,
       child: Row(children: [
-        RingProgress(value: score / 100, size: 104, center: '$score', caption: '/ 100'),
+        RingProgress(value: score / 100, size: 104, center: '$score', caption: isFr ? 'vs ton habitude' : 'vs your usual'),
         const SizedBox(width: 16),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (showAdviceNotifier.value) Padding(padding: const EdgeInsets.only(bottom: 8),

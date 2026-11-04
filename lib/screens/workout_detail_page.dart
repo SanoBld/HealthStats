@@ -151,6 +151,10 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
     final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
     final pts = _route.length > 1 ? _route.map((p) => p.pos).toList() : _preview;
     final alts = _route.map((p) => p.alt).where((a) => !a.isNaN).toList();
+    // stats from the session itself, or from the heart-rate curve found for that time slot
+    final hrVals = [for (final e in _hr) if (e.$2 >= 30 && e.$2 <= 230) e.$2];
+    final hrAvgV = w.hrAvg > 0 ? w.hrAvg : (hrVals.length >= 3 ? hrVals.fold<int>(0, (a, b) => a + b) / hrVals.length : 0.0);
+    final hrMaxV = w.hrMax > 0 ? w.hrMax : (hrVals.length >= 3 ? hrVals.reduce((a, b) => a > b ? a : b).toDouble() : 0.0);
     // recorded speed curve if the app wrote one, else computed from the GPS route
     final recSpeed = _spd.length > 5;
     final speeds = recSpeed ? _spd.map((e) => spdConv(e.$2 * 3.6)).toList() : _speeds().map(spdConv).toList();
@@ -197,8 +201,8 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
             StatTile(icon: Icons.speed_rounded, value: '${spdConv(w.speedKmh!).toStringAsFixed(1)} $spdUnit', label: isFr ? 'Vitesse moy.' : 'Avg speed', color: col),
           if (w.kcal > 0) StatTile(icon: Icons.local_fire_department_rounded, value: '${w.kcal.round()}', label: 'kcal', color: col),
           if (w.steps > 0) StatTile(icon: Icons.directions_walk_rounded, value: '${w.steps}', label: isFr ? 'Pas' : 'Steps', color: col),
-          if (w.hrAvg > 0) StatTile(icon: Icons.favorite_rounded, value: '${w.hrAvg.round()} bpm', label: isFr ? 'FC moyenne' : 'Avg HR', color: col),
-          if (w.hrMax > 0) StatTile(icon: Icons.monitor_heart_rounded, value: '${w.hrMax.round()} bpm', label: isFr ? 'FC max' : 'Max HR', color: col),
+          if (hrAvgV > 0) StatTile(icon: Icons.favorite_rounded, value: '${hrAvgV.round()} bpm', label: isFr ? 'FC moyenne' : 'Avg HR', color: col),
+          if (hrMaxV > 0) StatTile(icon: Icons.monitor_heart_rounded, value: '${hrMaxV.round()} bpm', label: isFr ? 'FC max' : 'Max HR', color: col),
           if (alts.length > 1) StatTile(icon: Icons.terrain_rounded, value: '+${_gain(alts).round()} m', label: isFr ? 'Dénivelé +' : 'Elevation +', color: col),
         ]),
         if (_hr.length > 1) ...[
@@ -206,11 +210,16 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
               values: _hr.map((e) => e.$2.toDouble()).toList(), color: s.primary, unit: 'bpm',
               labelOf: (i) => _clock(_hr[i].$1.difference(w.start)), onScrub: _hrCursor)),
+          if (HealthService.instance.hrIsGeneral(w) || w.hrAvg <= 0) Padding(padding: const EdgeInsets.fromLTRB(20, 6, 20, 0), child: Text(
+              isFr ? 'Cette séance n\'avait pas de fréquence cardiaque : elle vient de la fréquence cardiaque générale enregistrée pendant ce créneau.'
+                   : 'This workout had no heart rate: it comes from the general heart rate recorded during that time.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(color: s.onSurfaceVariant))),
           if (!_calm.contains(w.type)) ...[
             SectionTitle(isFr ? 'Zones de FC' : 'HR zones'),
             ..._zoneRows(context, _zones(maxHr), col),
           ],
         ],
+        ..._splitRows(context, col),
         if (alts.length > 1) ...[
           SectionTitle(isFr ? 'Altitude' : 'Elevation'),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
@@ -249,6 +258,41 @@ class _WorkoutDetailPageState extends State<WorkoutDetailPage> {
             child: Text('Source : ${w.sourceName}', style: t.labelSmall?.copyWith(color: s.onSurfaceVariant))),
       ]),
     );
+  }
+
+  /// Pace of each kilometre (like the splits of Strava), from the GPS route.
+  List<Widget> _splitRows(BuildContext c, Color col) {
+    if (_route.length < 3 || widget.workout.paceMinKm == null) return const [];
+    const d = Distance();
+    final splits = <double>[]; // seconds per km
+    var acc = 0.0, lastT = _route.first.time;
+    for (var i = 1; i < _route.length; i++) {
+      acc += d(_route[i - 1].pos, _route[i].pos);
+      if (acc >= 1000) {
+        final sec = _route[i].time.difference(lastT).inSeconds.toDouble();
+        if (sec > 0) splits.add(sec);
+        lastT = _route[i].time; acc -= 1000;
+      }
+    }
+    if (splits.length < 2) return const [];
+    final best = splits.reduce((a, b) => a < b ? a : b), worst = splits.reduce((a, b) => a > b ? a : b);
+    final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
+    String pace(double sec) => '${sec ~/ 60}:${(sec % 60).round().toString().padLeft(2, '0')}';
+    return [
+      SectionTitle(isFr ? 'Splits au kilomètre' : 'Splits per kilometre'),
+      Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: Column(children: [
+        for (var i = 0; i < splits.length; i++) Padding(padding: const EdgeInsets.symmetric(vertical: 3), child: Row(children: [
+          SizedBox(width: 30, child: Text('${i + 1}', style: t.labelLarge?.copyWith(color: s.onSurfaceVariant))),
+          Expanded(child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0, end: worst == best ? 1.0 : 0.35 + 0.65 * (1 - (splits[i] - best) / (worst - best))),
+            duration: Duration(milliseconds: 500 + 40 * i), curve: Curves.easeOutCubic,
+            builder: (_, v, _) => ClipRRect(borderRadius: BorderRadius.circular(8), child: LinearProgressIndicator(
+                value: v, minHeight: 22, color: splits[i] == best ? col : col.withValues(alpha: 0.55), backgroundColor: s.surfaceContainerHighest)))),
+          SizedBox(width: 64, child: Text('${pace(splits[i])} /km', textAlign: TextAlign.end,
+              style: t.labelLarge?.copyWith(fontWeight: splits[i] == best ? FontWeight.w900 : FontWeight.w600))),
+        ])),
+      ])),
+    ];
   }
 
   List<Widget> _zoneRows(BuildContext c, List<double> z, Color col) {

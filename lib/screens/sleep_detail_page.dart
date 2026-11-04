@@ -261,6 +261,26 @@ class _SleepDetailPageState extends State<SleepDetailPage> {
                 value: '${win.length}',
                 color: violet,
               ),
+              () {
+                // Regularity (like Oura's "sleep regularity"): spread of the bedtime over the period
+                final beds = [for (final d in _details) if (_sel.contains(d.end))
+                  (d.start.hour < 12 ? d.start.hour + 24 : d.start.hour) * 60 + d.start.minute];
+                final debt = win.fold<double>(0, (a, e) => a + math.max(0, 7 - e.$2));
+                final rows = <Widget>[];
+                if (beds.length >= 3) {
+                  final mean = beds.fold<int>(0, (a, b) => a + b) / beds.length;
+                  final sd = math.sqrt(beds.fold<double>(0, (a, b) => a + (b - mean) * (b - mean)) / beds.length);
+                  final lbl = sd < 30 ? (isFr ? 'très régulier' : 'very regular') : sd < 60 ? (isFr ? 'régulier' : 'regular') : (isFr ? 'irrégulier' : 'irregular');
+                  final mm = mean.round() % 1440;
+                  rows.add(_StatRow(icon: Icons.schedule_rounded, label: isFr ? 'Heure de coucher moyenne' : 'Average bedtime',
+                      value: '${(mm ~/ 60).toString().padLeft(2, '0')}:${(mm % 60).toString().padLeft(2, '0')}', color: violet));
+                  rows.add(_StatRow(icon: Icons.sync_rounded, label: isFr ? 'Régularité du coucher' : 'Bedtime regularity',
+                      value: '$lbl (±${sd.round()} min)', color: violet));
+                }
+                rows.add(_StatRow(icon: Icons.bedtime_off_rounded, label: isFr ? 'Dette de sommeil (objectif 7 h)' : 'Sleep debt (7 h goal)',
+                    value: _hm(debt), color: violet));
+                return Column(children: rows);
+              }(),
             ]),
           ),
         ],
