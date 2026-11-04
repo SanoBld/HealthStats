@@ -64,6 +64,19 @@ class _MetricPageState extends State<MetricPage> {
     return out;
   }
 
+  /// Same value as the headline, for the period before the chosen one.
+  double? _previous() {
+    final p = PeriodSel(mode: _sel.mode, anchor: _sel.anchor)..shift(-1);
+    // an unfinished period is compared with the same number of days of the previous one
+    final today = dayOnly(DateTime.now());
+    final elapsed = _sel.isCurrent && _sel.mode > 0 ? today.difference(_sel.start).inDays : null;
+    final cut = elapsed == null ? null : p.start.add(Duration(days: elapsed));
+    final l = [for (final e in widget.series) if (p.contains(e.$1) && (cut == null || !dayOnly(e.$1).isAfter(cut))) e.$2];
+    if (l.isEmpty) return null;
+    final sum = l.fold<double>(0, (a, b) => a + b);
+    return _sel.mode == 0 ? sum : widget.average ? sum / l.length : sum;
+  }
+
   @override
   Widget build(BuildContext context) {
     final s = Theme.of(context).colorScheme, t = Theme.of(context).textTheme;
@@ -95,6 +108,19 @@ class _MetricPageState extends State<MetricPage> {
             BigValue(widget.fmt(head), widget.unit, caption: _sel.mode == 0 || vals.isEmpty ? null
                 : widget.average ? (isFr ? 'moyenne' : 'average')
                 : '${isFr ? 'moyenne' : 'average'} ${widget.fmt(avg)} ${widget.unit}${_sel.mode == 3 ? (isFr ? ' / mois' : ' / month') : (isFr ? ' / jour' : ' / day')}'),
+            Builder(builder: (_) {
+              final prev = _previous();
+              if (prev == null || prev == 0 || head == 0) return const SizedBox.shrink();
+              final pct = ((head - prev) / prev * 100).round();
+              final what = [isFr ? 'la veille' : 'the day before', isFr ? 'la semaine précédente' : 'the previous week',
+                  isFr ? 'le mois précédent' : 'the previous month', isFr ? 'l\'année précédente' : 'the previous year'][_sel.mode];
+              return Padding(padding: const EdgeInsets.only(top: 6), child: Row(children: [
+                Icon(pct >= 0 ? Icons.trending_up_rounded : Icons.trending_down_rounded, size: 18, color: widget.color),
+                const SizedBox(width: 6),
+                Expanded(child: Text(isFr ? '${pct >= 0 ? '+' : ''}$pct % par rapport à $what' : '${pct >= 0 ? '+' : ''}$pct% versus $what',
+                    style: t.labelLarge?.copyWith(color: s.onSurfaceVariant))),
+              ]));
+            }),
             const SizedBox(height: 14),
             if (shownVals.isNotEmpty) ...[
               HighlightCard(

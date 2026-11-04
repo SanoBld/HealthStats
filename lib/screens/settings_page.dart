@@ -223,6 +223,7 @@ List<Widget> _appearanceRows(BuildContext ctx) => [
             onChanged: (v) => setHidden(hiddenTabsNotifier, e.$1, !v)),
         for (final e in [
           ('greeting', Icons.waving_hand_rounded, isFr ? 'Message d\'accueil' : 'Greeting'),
+          ('readiness', Icons.bolt_rounded, isFr ? 'Forme du jour' : 'Readiness'),
           ('goals', Icons.flag_rounded, isFr ? 'Objectif de la semaine' : 'Weekly goal'),
           ('steps7', Icons.directions_walk_rounded, isFr ? 'Pas, 7 derniers jours' : 'Steps, last 7 days'),
           ('kcal', Icons.local_fire_department_rounded, isFr ? 'Calories actives' : 'Active calories'),

@@ -243,3 +243,57 @@ class DashRecords extends StatelessWidget {
     );
   }
 }
+
+/// Estimated "form of the day" from last night's sleep, HRV and resting heart rate versus your own 30-day average.
+/// It is a personal indicator, not a medical score.
+class DashReadiness extends StatelessWidget {
+  final List<(DateTime, double)> sleep, hrv, rhr; final Color color;
+  const DashReadiness({super.key, required this.sleep, required this.hrv, required this.rhr, required this.color});
+
+  static double? _ratio(List<(DateTime, double)> l) {
+    if (l.length < 4) return null;
+    final last = l.last.$2;
+    final base = l.reversed.skip(1).take(30).map((e) => e.$2).toList();
+    final avg = base.fold<double>(0, (a, b) => a + b) / base.length;
+    return avg <= 0 ? null : last / avg;
+  }
+
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
+    final parts = <(String, double, String)>[]; // label, score 0..100, detail
+    if (sleep.isNotEmpty && DateTime.now().difference(sleep.last.$1).inDays <= 2) {
+      final h = sleep.last.$2;
+      parts.add((isFr ? 'Sommeil' : 'Sleep', (h / 8 * 100).clamp(0, 100).toDouble(), '${h.floor()} h ${((h - h.floor()) * 60).round().toString().padLeft(2, '0')}'));
+    }
+    final rh = _ratio(hrv);
+    if (rh != null) parts.add(('HRV', (70 + (rh - 1) * 150).clamp(0, 100).toDouble(), '${rh >= 1 ? '+' : ''}${((rh - 1) * 100).round()} %'));
+    final rr = _ratio(rhr);
+    if (rr != null) parts.add((isFr ? 'FC repos' : 'Resting HR', (70 - (rr - 1) * 300).clamp(0, 100).toDouble(), '${rr >= 1 ? '+' : ''}${((rr - 1) * 100).round()} %'));
+    if (parts.length < 2) return const SizedBox.shrink();
+    final score = (parts.fold<double>(0, (a, e) => a + e.$2) / parts.length).round();
+    final sentence = score >= 80
+        ? (isFr ? 'Très bonne forme : tes indicateurs sont au-dessus de ton habitude.' : 'Great shape: your indicators are above your usual.')
+        : score >= 60
+            ? (isFr ? 'Bonne forme : tout est dans ton rythme habituel.' : 'Good shape: everything is in your usual range.')
+            : score >= 40
+                ? (isFr ? 'Forme moyenne : privilégie une séance légère et un bon sommeil.' : 'Average shape: favor an easy session and good sleep.')
+                : (isFr ? 'Récupération incomplète : un jour de repos serait bienvenu.' : 'Incomplete recovery: a rest day would help.');
+    return HealthCard(
+      icon: Icons.bolt_rounded, title: isFr ? 'Forme du jour' : 'Readiness', color: color,
+      trailing: isFr ? 'estimation' : 'estimate',
+      child: Row(children: [
+        RingProgress(value: score / 100, size: 104, center: '$score', caption: '/ 100'),
+        const SizedBox(width: 16),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (showAdviceNotifier.value) Padding(padding: const EdgeInsets.only(bottom: 8),
+              child: Text(sentence, style: t.bodyMedium?.copyWith(height: 1.3))),
+          for (final p in parts) Padding(padding: const EdgeInsets.only(bottom: 4), child: Row(children: [
+            Expanded(child: Text(p.$1, style: t.labelMedium?.copyWith(color: s.onSurfaceVariant))),
+            Text(p.$3, style: t.labelMedium?.copyWith(fontWeight: FontWeight.w800)),
+          ])),
+        ])),
+      ]),
+    );
+  }
+}

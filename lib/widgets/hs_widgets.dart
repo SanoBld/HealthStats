@@ -11,13 +11,15 @@ import 'skeleton.dart' show M3LoadingIndicator;
 
 bool get isFr => localeNotifier.value == 'fr';
 String sportName(SportInfo s) => isFr ? s.fr : s.en;
-String fmtDate(DateTime d) {
-  final m = isFr
-      ? ['janv.', 'févr.', 'mars', 'avr.', 'mai', 'juin', 'juil.', 'août', 'sept.', 'oct.', 'nov.', 'déc.']
-      : ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${d.day} ${m[d.month - 1]} · ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
+const _monthsFr = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+const _monthsEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+/// Full month name, never abbreviated. The year is added when it is not the current one.
+String fmtDay(DateTime d) {
+  final m = (isFr ? _monthsFr : _monthsEn)[d.month - 1];
+  final y = d.year == DateTime.now().year ? '' : ' ${d.year}';
+  return isFr ? '${d.day == 1 ? '1er' : d.day} $m$y' : '$m ${d.day}$y';
 }
-String fmtDay(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+String fmtDate(DateTime d) => '${fmtDay(d)} · ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 DateTime? parseBirth(String v) => v.isEmpty ? null : DateTime.tryParse(v);
 String birthToStr(DateTime d) => '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
 Future<DateTime?> pickBirthDate(BuildContext c, DateTime? cur) => showM3DatePicker(c,

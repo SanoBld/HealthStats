@@ -134,6 +134,7 @@ class _DashboardPageState extends State<DashboardPage> {
               ]),
             ),
 
+            if (!isHidden(hiddenCardsNotifier, 'readiness')) DashReadiness(sleep: _sleep, hrv: _hrv, rhr: _rhr, color: green),
             if (!isHidden(hiddenCardsNotifier, 'goals')) DashGoals(hs: hs, color: green),
             if (!isHidden(hiddenCardsNotifier, 'steps7')) DashSteps7(hs: hs, color: fire, goal: goal,
                 onTap: () => _push(MetricPage(title: isFr ? 'Pas' : 'Steps', unit: isFr ? 'pas' : 'steps', icon: Icons.directions_walk_rounded, color: fire,
