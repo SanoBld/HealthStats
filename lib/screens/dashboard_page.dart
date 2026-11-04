@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../app_state.dart';
 import '../models/health_models.dart';
 import '../services/health_service.dart';
+import '../widgets/dashboard_extras.dart';
 import '../widgets/health_cards.dart';
 import '../widgets/hs_widgets.dart';
 import '../widgets/m3_components.dart' show M3CookieBadge, M3WavyProgress;
@@ -104,6 +105,7 @@ class _DashboardPageState extends State<DashboardPage> {
             if (hs.loading && hs.workouts.isEmpty)
               Center(child: SyncLoader(text: hs.stage.isEmpty ? (isFr ? 'Chargement…' : 'Loading…') : hs.stage, progress: hs.progress)),
 
+            if (!isHidden(hiddenCardsNotifier, 'greeting') && hs.permitted) DashGreeting(hs: hs, goal: goal, onOpen: open),
             SectionTitle(isFr ? 'Résumé' : 'Summary', compact: true),
             // ── today: tap = day / week / month / year ──
             HealthCard(
@@ -131,6 +133,14 @@ class _DashboardPageState extends State<DashboardPage> {
                 ])),
               ]),
             ),
+
+            if (!isHidden(hiddenCardsNotifier, 'goals')) DashGoals(hs: hs, color: green),
+            if (!isHidden(hiddenCardsNotifier, 'steps7')) DashSteps7(hs: hs, color: fire, goal: goal,
+                onTap: () => _push(MetricPage(title: isFr ? 'Pas' : 'Steps', unit: isFr ? 'pas' : 'steps', icon: Icons.directions_walk_rounded, color: fire,
+                    series: daily((d) => d.steps.toDouble()), fmt: (v) => v.round().toString()))),
+            if (!isHidden(hiddenCardsNotifier, 'kcal')) DashKcal(hs: hs, color: fire,
+                onTap: () => _push(MetricPage(title: isFr ? 'Calories actives' : 'Active calories', unit: 'kcal', icon: Icons.local_fire_department_rounded, color: fire,
+                    series: daily((d) => d.activeKcal), fmt: (v) => v.round().toString()))),
 
             // ── sleep ──
             if (!isHidden(hiddenCardsNotifier, 'sleep') && (_night != null || _sleep.isNotEmpty)) HealthCard(
@@ -202,6 +212,9 @@ class _DashboardPageState extends State<DashboardPage> {
                         fmt: (v) => v.toStringAsFixed(m.$6), desc: _metricDesc(m.$1), verdict: _metricVerdict(m.$1)))),
               ),
             ])),
+
+            if (!isHidden(hiddenCardsNotifier, 'onthisday')) DashOnThisDay(hs: hs, color: violet, onOpen: open),
+            if (!isHidden(hiddenCardsNotifier, 'records')) DashRecords(hs: hs, color: blue, onOpen: open),
 
             // ── activities ──
             SectionTitle(isFr ? 'Dernières activités' : 'Latest activities',

@@ -73,7 +73,7 @@ class _ProfileSheetState extends State<_ProfileSheet> {
 final Listenable _watch = Listenable.merge([
   HealthService.instance, themeModeNotifier, oledModeNotifier, hapticFeedbackNotifier, navLabelNotifier,
   textScaleNotifier, localeNotifier, unitsMetricNotifier, stepGoalNotifier, weeklyGoalNotifier,
-  profileNameNotifier, profileBirthNotifier, accentNotifier, useDynamicColorNotifier, appFontNotifier,
+  profileNameNotifier, profileBirthNotifier, accentNotifier, useDynamicColorNotifier, colorHarmonyNotifier, appFontNotifier,
   profileHeightNotifier, profileWeightNotifier, profileSexNotifier, sportColorsNotifier,
   showAdviceNotifier, hiddenTabsNotifier, hiddenCardsNotifier,
 ]);
@@ -196,6 +196,10 @@ List<Widget> _appearanceRows(BuildContext ctx) => [
             options: [('0', isFr ? 'Système' : 'System', null), ('1', isFr ? 'Clair' : 'Light', null), ('2', isFr ? 'Sombre' : 'Dark', null)],
             value: '${themeModeNotifier.value.index}', onChanged: (v) => themeModeNotifier.value = ThemeMode.values[int.parse(v)]),
         SettingSwitchRow(icon: Icons.auto_awesome_rounded, title: isFr ? 'Couleurs dynamiques' : 'Dynamic colors', value: useDynamicColorNotifier.value, onChanged: (v) => useDynamicColorNotifier.value = v),
+        SettingChoiceRow(icon: Icons.tune_rounded, title: isFr ? 'Harmonie des couleurs' : 'Color harmony',
+            options: [('mono', isFr ? 'Une teinte' : 'One hue', null), ('classic', isFr ? 'Classique' : 'Classic', null),
+              ('tinted', isFr ? 'Teinté' : 'Tinted', null), ('vivid', isFr ? 'Vif' : 'Vivid', null), ('soft', isFr ? 'Doux' : 'Soft', null)],
+            value: colorHarmonyNotifier.value, onChanged: (v) => colorHarmonyNotifier.value = v),
         SettingTile(
           leading: const Icon(Icons.color_lens_rounded), title: Text(isFr ? 'Couleur d\'accent' : 'Accent color'),
           trailing: Container(width: 28, height: 28, decoration: BoxDecoration(color: accentNotifier.value, shape: BoxShape.circle)),
@@ -218,6 +222,12 @@ List<Widget> _appearanceRows(BuildContext ctx) => [
         ]) SettingSwitchRow(icon: e.$2, title: e.$3, value: !isHidden(hiddenTabsNotifier, e.$1),
             onChanged: (v) => setHidden(hiddenTabsNotifier, e.$1, !v)),
         for (final e in [
+          ('greeting', Icons.waving_hand_rounded, isFr ? 'Message d\'accueil' : 'Greeting'),
+          ('goals', Icons.flag_rounded, isFr ? 'Objectif de la semaine' : 'Weekly goal'),
+          ('steps7', Icons.directions_walk_rounded, isFr ? 'Pas, 7 derniers jours' : 'Steps, last 7 days'),
+          ('kcal', Icons.local_fire_department_rounded, isFr ? 'Calories actives' : 'Active calories'),
+          ('onthisday', Icons.history_toggle_off_rounded, isFr ? 'Jour pour jour' : 'On this day'),
+          ('records', Icons.emoji_events_rounded, isFr ? 'Records personnels' : 'Personal records'),
           ('sleep', Icons.bedtime_rounded, isFr ? 'Carte Sommeil' : 'Sleep card'),
           ('heart', Icons.favorite_rounded, isFr ? 'Carte Fréquence cardiaque' : 'Heart rate card'),
           ('vitals', Icons.monitor_heart_rounded, isFr ? 'HRV, SpO₂ et poids' : 'HRV, SpO₂ and weight'),

@@ -106,11 +106,14 @@ class _SearchPageState extends State<SearchPage> {
               : ListView(padding: const EdgeInsets.only(bottom: 24), children: [
                   if (sports.isNotEmpty) ...[
                     SectionTitle(isFr ? 'Sports' : 'Sports'),
-                    for (final e in sports.take(q.isEmpty ? 8 : 30)) tile(
-                        Icon(sportOf(e.key).icon, color: sportColor(ctx, sportOf(e.key))),
-                        sportName(sportOf(e.key)),
-                        '${e.value.length} ${isFr ? 'activités' : 'activities'} · ${{for (final w in e.value) w.sourceName}.join(', ')}',
-                        () => _openList(ctx, sportName(sportOf(e.key)), e.value)),
+                    Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: LayoutBuilder(builder: (_, c) {
+                      final w = (c.maxWidth - 10) / 2;
+                      return Wrap(spacing: 10, runSpacing: 10, children: [
+                        for (final e in sports.take(q.isEmpty ? 8 : 30)) SizedBox(width: w, child: _SportBox(
+                          sport: sportOf(e.key), color: sportColor(ctx, sportOf(e.key)), name: sportName(sportOf(e.key)),
+                          ws: e.value, onTap: () => _openList(ctx, sportName(sportOf(e.key)), e.value))),
+                      ]);
+                    })),
                   ],
                   if (apps.isNotEmpty) ...[
                     SectionTitle(isFr ? 'Applications' : 'Apps'),
@@ -210,5 +213,37 @@ class _PlaceResultsPageState extends State<_PlaceResultsPage> {
         ]),
       );
     });
+  }
+}
+
+/// Framed card for one sport: icon, name, number of activities, total time and distance.
+class _SportBox extends StatelessWidget {
+  final dynamic sport; final Color color; final String name; final List<Workout> ws; final VoidCallback onTap;
+  const _SportBox({required this.sport, required this.color, required this.name, required this.ws, required this.onTap});
+  @override
+  Widget build(BuildContext c) {
+    final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
+    final mins = ws.fold<int>(0, (a, w) => a + w.duration.inMinutes);
+    final km = ws.fold<double>(0, (a, w) => a + w.distanceM) / 1000;
+    return Material(
+      color: Color.alphaBlend(color.withValues(alpha: 0.08), s.surfaceContainer),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22), side: BorderSide(color: color.withValues(alpha: 0.45), width: 1.4)),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(22), onTap: onTap,
+        child: Padding(padding: const EdgeInsets.all(14), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            Container(width: 38, height: 38, decoration: BoxDecoration(color: color.withValues(alpha: 0.18), shape: BoxShape.circle),
+                child: Icon(sport.icon as IconData, color: color, size: 22)),
+            const Spacer(),
+            Text('${ws.length}', style: t.titleLarge?.copyWith(fontWeight: FontWeight.w900, color: color)),
+          ]),
+          const SizedBox(height: 10),
+          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: t.titleSmall?.copyWith(fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text('${mins ~/ 60} h ${(mins % 60).toString().padLeft(2, '0')}${km >= 0.1 ? ' · ${km.toStringAsFixed(km >= 100 ? 0 : 1)} km' : ''}',
+              maxLines: 1, overflow: TextOverflow.ellipsis, style: t.bodySmall?.copyWith(color: s.onSurfaceVariant)),
+        ])),
+      ),
+    );
   }
 }

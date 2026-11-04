@@ -11,6 +11,7 @@ import 'services/update_service.dart';
 import 'theme/m3_interaction.dart';
 import 'theme/m3_motion.dart';
 import 'theme/m3_shapes.dart';
+import 'theme/app_scheme.dart';
 import 'widgets/app_text_scale.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
@@ -41,24 +42,27 @@ class HealthStatsApp extends StatelessWidget {
       return ListenableBuilder(
         listenable: Listenable.merge([
           themeModeNotifier, localeNotifier,
-          navLabelNotifier, accentNotifier, useDynamicColorNotifier, oledModeNotifier,
+          navLabelNotifier, accentNotifier, useDynamicColorNotifier, colorHarmonyNotifier, oledModeNotifier,
           onboardedNotifier,
         ]),
         builder: (_, _) {
           final labels = navLabelNotifier.value;
           final dyn = useDynamicColorNotifier.value;
           final seed = accentNotifier.value;
-          ColorScheme ls = (dyn && lightDyn != null) ? lightDyn.harmonized() : ColorScheme.fromSeed(seedColor: seed);
+          final harmony = colorHarmonyNotifier.value;
+          final ColorScheme ls = (dyn && lightDyn != null)
+              ? applyColorHarmony(neutralizeIfGraySchemeItself(lightDyn.harmonized()), harmony)
+              : buildAppScheme(seed, Brightness.light, harmony);
           ColorScheme ds = (dyn && darkDyn != null)
-              ? darkDyn.harmonized()
-              : ColorScheme.fromSeed(seedColor: seed, brightness: Brightness.dark);
-          if (dyn) {
-            ls = ls.copyWith(outlineVariant: ls.outlineVariant.withValues(alpha: 0.7));
-            ds = ds.copyWith(outlineVariant: ds.outlineVariant.withValues(alpha: 0.7));
-          }
+              ? applyColorHarmony(neutralizeIfGraySchemeItself(darkDyn.harmonized()), harmony)
+              : buildAppScheme(seed, Brightness.dark, harmony);
           if (oledModeNotifier.value) {
-            ds = ds.copyWith(surface: Colors.black, surfaceContainerLowest: Colors.black,
-                surfaceContainerLow: const Color(0xFF080808), surfaceContainer: const Color(0xFF0D0D0D));
+            ds = ds.copyWith(
+                surface: Colors.black, surfaceDim: Colors.black, surfaceBright: const Color(0xFF1C1C1C),
+                surfaceContainerLowest: Colors.black, surfaceContainerLow: const Color(0xFF080808),
+                surfaceContainer: const Color(0xFF0D0D0D), surfaceContainerHigh: const Color(0xFF141414),
+                surfaceContainerHighest: const Color(0xFF1C1C1C));
+            if (harmony == 'tinted') ds = tintNeutrals(ds);
           }
           final light = _fin(applyM3Interaction(applyM3Shapes(ThemeData(colorScheme: ls, useMaterial3: true))), labels);
           final dark = _fin(applyM3Interaction(applyM3Shapes(ThemeData(colorScheme: ds, useMaterial3: true))), labels);

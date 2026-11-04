@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 final themeModeNotifier        = ValueNotifier<ThemeMode>(ThemeMode.system);
 final accentNotifier           = ValueNotifier<Color>(const Color(0xFFFF2020));
 final useDynamicColorNotifier  = ValueNotifier<bool>(false);
+final colorHarmonyNotifier     = ValueNotifier<String>('mono'); // mono | classic | tinted | vivid | soft
 final localeNotifier           = ValueNotifier<String>('fr');
 final displayNameNotifier      = ValueNotifier<String>('');
 final oledModeNotifier         = ValueNotifier<bool>(false);
@@ -46,6 +47,8 @@ Future<void> loadAppState() async {
   textScaleNotifier.value = p.getDouble('hs_textscale') ?? 1.1;
   appFontNotifier.value = p.getString('hs_font') ?? 'GoogleSansFlex';
   accentNotifier.value = Color(p.getInt('hs_accent') ?? 0xFFFF2020);
+  useDynamicColorNotifier.value = p.getBool('hs_dynamic') ?? false;
+  colorHarmonyNotifier.value = p.getString('hs_harmony') ?? 'mono';
   profileNameNotifier.value = p.getString('hs_name') ?? '';
   profileHeightNotifier.value = p.getDouble('hs_height') ?? 0;
   profileWeightNotifier.value = p.getDouble('hs_weight') ?? 0;
@@ -73,6 +76,7 @@ void bindPersistence(SharedPreferences p) {
   themeModeNotifier.addListener(() => p.setInt('hs_theme', themeModeNotifier.value.index));
   accentNotifier.addListener(() => p.setInt('hs_accent', accentNotifier.value.toARGB32()));
   b(localeNotifier, 'hs_locale');
+  b(useDynamicColorNotifier, 'hs_dynamic'); b(colorHarmonyNotifier, 'hs_harmony');
   b(oledModeNotifier, 'hs_oled');
   b(hapticFeedbackNotifier, 'hs_haptic'); b(navLabelNotifier, 'hs_navlabels');
   b(textScaleNotifier, 'hs_textscale'); b(appFontNotifier, 'hs_font');

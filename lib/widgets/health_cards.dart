@@ -11,7 +11,10 @@ class HealthCard extends StatelessWidget {
   @override
   Widget build(BuildContext c) {
     final s = Theme.of(c).colorScheme, t = Theme.of(c).textTheme;
-    return Padding(
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0, end: 1), duration: const Duration(milliseconds: 500), curve: Curves.easeOutCubic,
+      builder: (_, v, child) => Opacity(opacity: v, child: Transform.translate(offset: Offset(0, 20 * (1 - v)), child: child)),
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Material(
         color: Color.alphaBlend(color.withValues(alpha: 0.10), s.surfaceContainer),
@@ -34,7 +37,7 @@ class HealthCard extends StatelessWidget {
           ]),
         )),
       ),
-    );
+    ));
   }
 }
 

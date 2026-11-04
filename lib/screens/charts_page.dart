@@ -8,9 +8,9 @@ import '../services/health_service.dart';
 import '../widgets/charts.dart';
 import '../widgets/hs_widgets.dart';
 import '../widgets/m3_components.dart';
+import '../widgets/period_picker.dart';
 
 enum _Metric { sessions, minutes, distance, kcal, steps }
-enum _Period { day, week, month }
 
 class ChartsPage extends StatefulWidget {
   const ChartsPage({super.key});
@@ -20,7 +20,7 @@ class ChartsPage extends StatefulWidget {
 
 class _ChartsPageState extends State<ChartsPage> {
   _Metric _metric = _Metric.minutes;
-  _Period _period = _Period.week;
+  final PeriodSel _sel = PeriodSel(mode: 1);
   int? _type;
   late final Future<List<(DateTime, double)>> _weights = HealthService.instance.weights();
   late final Future<List<(DateTime, double)>> _sleep = HealthService.instance.sleepNights();
@@ -35,7 +35,6 @@ class _ChartsPageState extends State<ChartsPage> {
 
   String _k2(int n) => n.toString().padLeft(2, '0');
   String _day(DateTime d) => '${d.year}-${_k2(d.month)}-${_k2(d.day)}';
-  DateTime _monday(DateTime d) => DateTime(d.year, d.month, d.day).subtract(Duration(days: d.weekday - 1));
 
   int _val(Workout w) => switch (_metric) {
         _Metric.sessions => 1,
@@ -45,28 +44,28 @@ class _ChartsPageState extends State<ChartsPage> {
         _Metric.steps => w.steps,
       };
 
-  String _bucket(DateTime d) => switch (_period) {
-        _Period.day => _day(d),
-        _Period.week => _day(_monday(d)),
-        _Period.month => '${d.year}-${_k2(d.month)}',
+  /// Fixed window = the chosen period. Day: 24 hours, week / month: days, year: months.
+  String _bucket(DateTime d) => switch (_sel.mode) {
+        0 => '${_k2(d.hour)}h',
+        1 || 2 => _day(d),
+        _ => '${d.year}-${_k2(d.month)}',
       };
 
   Map<String, int> _series(HealthService hs, List<Workout> ws) {
-    final now = DateTime.now();
     final keys = <String>[];
-    switch (_period) {
-      case _Period.day:
-        for (var i = 29; i >= 0; i--) { keys.add(_day(now.subtract(Duration(days: i)))); }
-      case _Period.week:
-        for (var i = 11; i >= 0; i--) { keys.add(_day(_monday(now).subtract(Duration(days: 7 * i)))); }
-      case _Period.month:
-        for (var i = 11; i >= 0; i--) { final d = DateTime(now.year, now.month - i, 1); keys.add('${d.year}-${_k2(d.month)}'); }
+    final today = dayOnly(DateTime.now());
+    switch (_sel.mode) {
+      case 0: for (var h = 0; h < 24; h++) { keys.add('${_k2(h)}h'); }
+      case 1 || 2:
+        for (var d = _sel.start; !d.isAfter(_sel.end); d = DateTime(d.year, d.month, d.day + 1)) { if (!d.isAfter(today)) keys.add(_day(d)); }
+      default: for (var m = 1; m <= 12; m++) { keys.add('${_sel.anchor.year}-${_k2(m)}'); }
     }
     final out = {for (final k in keys) k: 0};
     if (_metric == _Metric.steps && _type == null) {
-      for (final d in hs.days) { final k = _bucket(d.day); if (out.containsKey(k)) out[k] = out[k]! + d.steps; }
+      if (_sel.mode == 0) return out; // steps are only known per day
+      for (final d in hs.days) { if (!_sel.contains(d.day)) continue; final k = _bucket(d.day); if (out.containsKey(k)) out[k] = out[k]! + d.steps; }
     } else {
-      for (final w in ws) { final k = _bucket(w.start); if (out.containsKey(k)) out[k] = out[k]! + _val(w); }
+      for (final w in ws) { if (!_sel.contains(w.start)) continue; final k = _bucket(w.start); if (out.containsKey(k)) out[k] = out[k]! + _val(w); }
     }
     return out;
   }
@@ -76,28 +75,28 @@ class _ChartsPageState extends State<ChartsPage> {
     final hs = HealthService.instance;
     return ListenableBuilder(listenable: Listenable.merge([hs, localeNotifierListenable]), builder: (ctx, _) {
       final ws = hs.workouts.where((w) => _type == null || w.type == _type).toList();
+      final inP = ws.where((w) => _sel.contains(w.start)).toList();
       final series = _series(hs, ws);
-      // By weekday (last 12 weeks)
-      final lim = DateTime.now().subtract(const Duration(days: 84));
+      // By weekday, inside the period
       final byDay = {for (var d = 1; d <= 7; d++) d: 0};
-      for (final w in ws.where((w) => w.start.isAfter(lim))) { byDay[w.start.weekday] = byDay[w.start.weekday]! + _val(w); }
-      // Share by sport (duration, 30 days)
-      final per = <int, int>{};
-      for (final w in hs.workouts.where((w) => w.start.isAfter(DateTime.now().subtract(const Duration(days: 30))))) {
+      for (final w in inP) { byDay[w.start.weekday] = byDay[w.start.weekday]! + _val(w); }
+      // Share by sport (duration) inside the period
+      final per = <int, int>{}, perKcal = <int, int>{};
+      for (final w in hs.workouts.where((w) => _sel.contains(w.start))) {
         per[w.type] = (per[w.type] ?? 0) + w.duration.inMinutes;
+        perKcal[w.type] = (perKcal[w.type] ?? 0) + w.kcal.round();
       }
-      final share = per.entries.toList()..sort((a, b) => b.value.compareTo(a.value));
+      final share = per.entries.where((e) => e.value > 0).toList()..sort((a, b) => b.value.compareTo(a.value));
+      final shareK = perKcal.entries.where((e) => e.value > 0).toList()..sort((a, b) => b.value.compareTo(a.value));
+      final first = hs.workouts.isEmpty ? dayOnly(DateTime.now()) : dayOnly(hs.workouts.map((w) => w.start).reduce((a, b) => a.isBefore(b) ? a : b));
+      final p = Theme.of(ctx).colorScheme;
 
       return SafeArea(child: ListView(children: [
         M3PageHeader(showBack: false, title: L.navCharts),
-        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: M3SegmentedButton<_Period>(
-          segments: [
-            ButtonSegment(value: _Period.day, label: Text(isFr ? 'Jour' : 'Day')),
-            ButtonSegment(value: _Period.week, label: Text(isFr ? 'Semaine' : 'Week')),
-            ButtonSegment(value: _Period.month, label: Text(isFr ? 'Mois' : 'Month')),
-          ],
-          selected: {_period}, onSelectionChanged: (v) => setState(() => _period = v.first),
-        )),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: PeriodModeBar(sel: _sel, changed: () => setState(() {}))),
+        const SizedBox(height: 10),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: PeriodNav(sel: _sel, first: first, last: dayOnly(DateTime.now()), changed: () => setState(() {}))),
         SizedBox(height: 50, child: ListView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6), children: [
           for (final m in _Metric.values) Padding(padding: const EdgeInsets.symmetric(horizontal: 4),
               child: M3Chip(label: Text(_label(m)), selected: _metric == m, onSelected: (_) => setState(() => _metric = m))),
@@ -117,23 +116,63 @@ class _ChartsPageState extends State<ChartsPage> {
             },
           ),
         ])),
-        Divider(height: 1, thickness: 1, color: Theme.of(ctx).colorScheme.outlineVariant.withValues(alpha: 0.3)),
+        Divider(height: 1, thickness: 1, color: p.outlineVariant.withValues(alpha: 0.3)),
         const SizedBox(height: 12),
-        ...[
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TrendChart(key: ValueKey('$_period$_metric$_type'), monthly: series)),
-            const SizedBox(height: 16),
-            Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: WeekChart(data: byDay)),
-            if (share.isNotEmpty && _type == null) ...[
-              SectionTitle(isFr ? 'Répartition (30 j, durée)' : 'Share (30d, duration)'),
-              Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ShareDonut(
-                items: share, getLabel: (e) => sportName(sportOf((e as MapEntry<int, int>).key)),
-                getPlays: (e) => (e as MapEntry<int, int>).value)),
-            ],
-            ..._trends(hs),
+        Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: TrendChart(key: ValueKey('${_sel.mode}${_sel.start}$_metric$_type'), monthly: series)),
+        if (_sel.mode != 0) ...[
+          const SizedBox(height: 16),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: WeekChart(data: byDay)),
         ],
+        if (share.isNotEmpty && _type == null) ...[
+          SectionTitle(isFr ? 'Répartition par sport (durée)' : 'Share by sport (duration)'),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ShareDonut(
+            items: share, getLabel: (e) => sportName(sportOf((e as MapEntry<int, int>).key)),
+            getPlays: (e) => (e as MapEntry<int, int>).value)),
+        ],
+        if (shareK.isNotEmpty && _type == null) ...[
+          SectionTitle(isFr ? 'Calories par sport' : 'Calories by sport'),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ShareDonut(
+            items: shareK, getLabel: (e) => sportName(sportOf((e as MapEntry<int, int>).key)),
+            getPlays: (e) => (e as MapEntry<int, int>).value)),
+        ],
+        ..._workoutCharts(inP),
+        ..._trends(hs),
         const SizedBox(height: 32),
       ]));
     });
+  }
+}
+
+extension _WorkoutCharts on _ChartsPageState {
+  String _lab(DateTime d) => fullDate(d, weekday: false);
+  /// Per-workout curves inside the period: pace, speed, energy used, intensity.
+  List<Widget> _workoutCharts(List<Workout> inP) {
+    final p = Theme.of(context).colorScheme.primary;
+    final sorted = [...inP]..sort((a, b) => a.start.compareTo(b.start));
+    final pace = sorted.where((w) => w.paceMinKm != null && w.paceMinKm! < 20).toList();
+    final kcal = sorted.where((w) => w.kcal > 0).toList();
+    final hr = sorted.where((w) => w.hrAvg > 0).toList();
+    final dist = sorted.where((w) => w.distanceM > 100).toList();
+    String lab(Workout w) => '${_lab(w.start)} · ${sportName(w.sport)}';
+    Widget chart(String title, List<double> v, String unit, String Function(int) l, {int dec = 0}) => Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SectionTitle(title),
+          Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(values: v, color: p, unit: unit, decimals: dec, labelOf: l)),
+        ]);
+    final totalKcal = sorted.fold<double>(0, (a, w) => a + w.kcal);
+    final days = (_sel.end.difference(_sel.start).inDays + 1).clamp(1, 366);
+    return [
+      if (pace.length > 1) chart(isFr ? 'Allure par séance (min/km)' : 'Pace per workout (min/km)', [for (final w in pace) w.paceMinKm!], 'min/km', (i) => lab(pace[i]), dec: 1),
+      if (dist.length > 1) chart(isFr ? 'Distance par séance' : 'Distance per workout', [for (final w in dist) w.distanceM / 1000], 'km', (i) => lab(dist[i]), dec: 1),
+      if (kcal.length > 1) chart(isFr ? 'Calories par séance' : 'Calories per workout', [for (final w in kcal) w.kcal], 'kcal', (i) => lab(kcal[i])),
+      if (hr.length > 1) chart(isFr ? 'Intensité : FC moyenne par séance' : 'Intensity: average heart rate per workout', [for (final w in hr) w.hrAvg], 'bpm', (i) => lab(hr[i])),
+      if (totalKcal > 0) Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 0), child: Row(children: [
+        Expanded(child: StatBadge(icon: Icons.local_fire_department_rounded, label: isFr ? 'Total' : 'Total', color: p, value: '${totalKcal.round()} kcal')),
+        const SizedBox(width: 8),
+        Expanded(child: StatBadge(icon: Icons.today_rounded, label: isFr ? 'Moyenne par jour' : 'Average per day', color: p, value: '${(totalKcal / days).round()} kcal')),
+        const SizedBox(width: 8),
+        Expanded(child: StatBadge(icon: Icons.fitness_center_rounded, label: isFr ? 'Par séance' : 'Per workout', color: p, value: '${(totalKcal / sorted.length).round()} kcal')),
+      ])),
+    ];
   }
 }
 
@@ -155,7 +194,8 @@ const _extra = [
 /// One optional chart: shown when there is data; if the permission is missing, asks for it right here.
 class _MetricChart extends StatefulWidget {
   final _MetricSpec spec; final String Function(DateTime) label; final Color color;
-  const _MetricChart({required this.spec, required this.label, required this.color});
+  final List<(DateTime, double)> Function(List<(DateTime, double)>) win;
+  const _MetricChart({required this.spec, required this.label, required this.color, required this.win});
   @override
   State<_MetricChart> createState() => _MetricChartState();
 }
@@ -173,7 +213,7 @@ class _MetricChartState extends State<_MetricChart> {
             text: isFr ? 'Autorise « ${m.fr} » pour afficher ce graphe.' : 'Allow “${m.en}” to show this chart.');
       }
       return FutureBuilder<List<(DateTime, double)>>(future: _f, builder: (_, snap) {
-        final d = snap.data ?? const <(DateTime, double)>[];
+        final d = widget.win(snap.data ?? const <(DateTime, double)>[]);
         if (d.length < 2) return const SizedBox.shrink();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle(isFr ? m.fr : m.en),
@@ -186,37 +226,43 @@ class _MetricChartState extends State<_MetricChart> {
 }
 
 extension _Trends on _ChartsPageState {
-  /// Touchable daily curves: heart rate, steps, weight (drag a finger to read each day).
+  /// Period window for sparse series: inside the period, or the 14 last values before its end when the period is a single day.
+  List<(DateTime, double)> _win(List<(DateTime, double)> l) {
+    final inside = l.where((e) => _sel.contains(e.$1)).toList();
+    if (inside.length >= 2 || _sel.mode != 0) return inside;
+    final before = l.where((e) => !dayOnly(e.$1).isAfter(_sel.end)).toList();
+    return before.skip(before.length > 14 ? before.length - 14 : 0).toList();
+  }
+
+  /// Touchable daily curves on the chosen period: heart rate, steps, sleep, weight and the optional metrics.
   List<Widget> _trends(HealthService hs) {
-    final lim = DateTime.now().subtract(const Duration(days: 90));
-    final d90 = hs.days.where((d) => d.day.isAfter(lim)).toList();
-    final hr = d90.where((d) => d.hrAvg > 0).toList();
-    final st = d90.where((d) => d.steps > 0).toList();
-    String lab(DateTime d) => '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}';
+    final hr = _win([for (final d in hs.days) if (d.hrAvg > 0) (d.day, d.hrAvg)]);
+    final st = _win([for (final d in hs.days) if (d.steps > 0) (d.day, d.steps.toDouble())]);
+    String lab(DateTime d) => fullDate(d, weekday: false);
     final p = Theme.of(context).colorScheme.primary;
     return [
       if (hr.length > 1) ...[
-        SectionTitle(isFr ? 'Fréquence cardiaque moyenne (90 j)' : 'Average heart rate (90d)'),
+        SectionTitle(isFr ? 'Fréquence cardiaque moyenne' : 'Average heart rate'),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
-            values: hr.map((d) => d.hrAvg).toList(), color: p, unit: 'bpm', labelOf: (i) => lab(hr[i].day))),
+            values: hr.map((d) => d.$2).toList(), color: p, unit: 'bpm', labelOf: (i) => lab(hr[i].$1))),
       ],
       if (st.length > 1) ...[
-        SectionTitle(isFr ? 'Pas par jour (90 j)' : 'Steps per day (90d)'),
+        SectionTitle(isFr ? 'Pas par jour' : 'Steps per day'),
         Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
-            values: st.map((d) => d.steps.toDouble()).toList(), color: p, unit: isFr ? 'pas' : 'steps', labelOf: (i) => lab(st[i].day))),
+            values: st.map((d) => d.$2).toList(), color: p, unit: isFr ? 'pas' : 'steps', labelOf: (i) => lab(st[i].$1))),
       ],
-      for (final m in _extra) _MetricChart(spec: m, label: lab, color: p),
+      for (final m in _extra) _MetricChart(spec: m, label: lab, color: p, win: _win),
       FutureBuilder<List<(DateTime, double)>>(future: _sleep, builder: (_, snap) {
-        final sl = (snap.data ?? const <(DateTime, double)>[]).where((e) => e.$2 > 0.5).toList();
+        final sl = _win((snap.data ?? const <(DateTime, double)>[]).where((e) => e.$2 > 0.5).toList());
         if (sl.length < 2) return const SizedBox.shrink();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          SectionTitle(isFr ? 'Sommeil par nuit (90 j)' : 'Sleep per night (90d)'),
+          SectionTitle(isFr ? 'Sommeil par nuit' : 'Sleep per night'),
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(
               values: sl.map((e) => e.$2).toList(), color: p, unit: 'h', decimals: 1, labelOf: (i) => lab(sl[i].$1))),
         ]);
       }),
       FutureBuilder<List<(DateTime, double)>>(future: _weights, builder: (_, snap) {
-        final w = snap.data ?? const <(DateTime, double)>[];
+        final w = _win(snap.data ?? const <(DateTime, double)>[]);
         if (w.length < 2) return const SizedBox.shrink();
         return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           SectionTitle(isFr ? 'Poids' : 'Weight'),
