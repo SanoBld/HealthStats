@@ -160,12 +160,22 @@ extension _WorkoutCharts on _ChartsPageState {
           Padding(padding: const EdgeInsets.symmetric(horizontal: 16), child: ScrubChart(values: v, color: p, unit: unit, decimals: dec, labelOf: l)),
         ]);
     final totalKcal = sorted.fold<double>(0, (a, w) => a + w.kcal);
+    // weekly volume: minutes of sessions per week (Monday start)
+    final wk = <DateTime, double>{};
+    for (final w in sorted) {
+      final d = DateTime(w.start.year, w.start.month, w.start.day);
+      final m = d.subtract(Duration(days: d.weekday - 1));
+      wk[m] = (wk[m] ?? 0) + w.duration.inMinutes;
+    }
+    final wkKeys = wk.keys.toList()..sort();
     final days = (_sel.end.difference(_sel.start).inDays + 1).clamp(1, 366);
     return [
       if (pace.length > 1) chart(isFr ? 'Allure par séance (min/km)' : 'Pace per workout (min/km)', [for (final w in pace) w.paceMinKm!], 'min/km', (i) => lab(pace[i]), dec: 1),
       if (dist.length > 1) chart(isFr ? 'Distance par séance' : 'Distance per workout', [for (final w in dist) w.distanceM / 1000], 'km', (i) => lab(dist[i]), dec: 1),
       if (eff.length > 1) chart(isFr ? 'Efficacité aérobie (vitesse ÷ FC, plus haut = mieux)' : 'Aerobic efficiency (speed ÷ HR, higher is better)',
           [for (final w in eff) w.speedKmh! * 1000 / 60 / w.hrAvg * 100], '', (i) => lab(eff[i]), dec: 1),
+      if (wkKeys.length > 1) chart(isFr ? 'Volume par semaine (minutes · repère OMS : 150 min)' : 'Weekly volume (minutes · WHO guide: 150 min)',
+          [for (final k in wkKeys) wk[k]!], 'min', (i) => (isFr ? 'Semaine du ' : 'Week of ') + _lab(wkKeys[i])),
       if (kcal.length > 1) chart(isFr ? 'Calories par séance' : 'Calories per workout', [for (final w in kcal) w.kcal], 'kcal', (i) => lab(kcal[i])),
       if (hr.length > 1) chart(isFr ? 'Intensité : FC moyenne par séance' : 'Intensity: average heart rate per workout', [for (final w in hr) w.hrAvg], 'bpm', (i) => lab(hr[i])),
       if (totalKcal > 0) Padding(padding: const EdgeInsets.fromLTRB(16, 14, 16, 0), child: Row(children: [
