@@ -51,6 +51,7 @@
     </queries>
 
     <application
+        android:enableOnBackInvokedCallback="true"
         android:label="HealthStats"
         android:allowBackup="false"
         android:name="${applicationName}"

@@ -62,7 +62,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final vis = [for (final e in all) if (e.$1 == 'dash' || !isHidden(hiddenTabsNotifier, e.$1)) e];
     final idx = _idx.clamp(0, vis.length - 1);
     final pages = [for (final e in vis) ClipRect(child: ColoredBox(color: bg, child: e.$2))];
-    return Scaffold(
+    return PopScope(
+      canPop: idx == 0,
+      onPopInvokedWithResult: (didPop, _) { if (!didPop) setState(() => _idx = 0); },
+      child: Scaffold(
       body: ScrollStatusBarHost(
         color: bg,
         resetToken: idx,
@@ -77,6 +80,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         },
         destinations: [for (final e in vis) e.$3],
       ),
-    );
+    ));
   }
 }

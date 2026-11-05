@@ -103,7 +103,7 @@ class _SearchPageState extends State<SearchPage> {
           Expanded(child: hs.workouts.isEmpty
               ? (hs.loading ? Center(child: SyncLoader(text: hs.stage.isEmpty ? '…' : hs.stage, progress: hs.progress))
                   : M3EmptyState(icon: Icons.search_rounded, message: isFr ? 'Aucune donnée' : 'No data'))
-              : ListView(padding: const EdgeInsets.only(bottom: 24), children: [
+              : ListView(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.only(bottom: 24), children: [
                   if (sports.isNotEmpty) ...[
                     SectionTitle(isFr ? 'Sports' : 'Sports'),
                     Padding(padding: const EdgeInsets.symmetric(horizontal: 12), child: LayoutBuilder(builder: (_, c) {
@@ -169,7 +169,7 @@ class _WorkoutListPageState extends State<WorkoutListPage> {
           ])),
           Expanded(child: list.isEmpty
               ? M3EmptyState(icon: Icons.search_off_rounded, message: isFr ? 'Aucune donnée' : 'No data')
-              : ListView.builder(padding: const EdgeInsets.only(bottom: 24), itemCount: list.length,
+              : ListView.builder(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.only(bottom: 24), itemCount: list.length,
                   itemBuilder: (_, i) => WorkoutCard(w: list[i], onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => WorkoutDetailPage(workout: list[i])))))),
         ]),
       );
@@ -208,7 +208,7 @@ class _PlaceResultsPageState extends State<_PlaceResultsPage> {
               ? (hs.trackBusy
                   ? Center(child: SyncLoader(text: isFr ? 'Lecture des tracés…' : 'Reading routes…', progress: hs.trackProgress))
                   : M3EmptyState(icon: Icons.place_rounded, message: isFr ? 'Aucune donnée autour de ce lieu' : 'No data around this place'))
-              : ListView.builder(padding: const EdgeInsets.only(bottom: 24), itemCount: found.length,
+              : ListView.builder(keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag, padding: const EdgeInsets.only(bottom: 24), itemCount: found.length,
                   itemBuilder: (_, i) => WorkoutCard(w: found[i], onTap: () => Navigator.push(ctx, MaterialPageRoute(builder: (_) => WorkoutDetailPage(workout: found[i])))))),
         ]),
       );
