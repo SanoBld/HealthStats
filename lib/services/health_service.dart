@@ -140,7 +140,7 @@ class HealthService extends ChangeNotifier {
             'start': g.last.start.millisecondsSinceEpoch - 1000,
             'end': g.first.end.millisecondsSinceEpoch + 1000}, const Duration(seconds: 60));
           final byId = {for (final w in workouts) w.id: w};
-          for (final e in ws) { final w = Workout.fromMap(Map.from(e as Map)); byId[w.id] = w; _statsOk.add(w.id); }
+          for (final e in ws) { final w = Workout.fromMap(Map.from(e as Map)); byId[w.id] = w; _statsOk.add(w.id); _hrGeneral.remove(w.id); _hrChecked.remove(w.id); }
           workouts = byId.values.toList()..sort((x, y) => y.start.compareTo(x.start));
           _applyImports();
           fails = 0;
