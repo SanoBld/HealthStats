@@ -21,7 +21,7 @@ android {
         versionCode = appBuild
         versionName = appVersion
         buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
-        androidResources.localeFilters += listOf("en", "fr")
+        resourceConfigurations += listOf("en", "fr")
     }
 
     // Same signature on every build, so updates install over the old app.
