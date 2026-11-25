@@ -32,11 +32,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      # Installs Gradle 8.9 itself, so the repo does not need gradlew / the wrapper jar.
+      # Installs Gradle 8.11.1 itself, so the repo does not need gradlew / the wrapper jar.
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.11.1'
 
       # No version given = dev build: it never pretends to be a real release.
       - name: Build release APKs

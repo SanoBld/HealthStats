@@ -12,7 +12,7 @@ val githubRepo = providers.gradleProperty("githubRepo").getOrElse("SanoBld/Healt
 
 android {
     namespace = "com.healthstats.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.healthstats.app"
