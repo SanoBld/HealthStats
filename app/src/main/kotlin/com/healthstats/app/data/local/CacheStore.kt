@@ -8,6 +8,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.serializer
 import kotlinx.serialization.json.Json
 import java.io.File
 
@@ -43,7 +44,7 @@ class CacheStore(private val dir: File) {
     private suspend inline fun <reified T> read(f: File): T? = withContext(Dispatchers.IO) {
         mutex.withLock {
             try {
-                if (f.exists()) HsJson.decodeFromString<T>(f.readText()) else null
+                if (f.exists()) HsJson.decodeFromString(serializer<T>(), f.readText()) else null
             } catch (e: Exception) { null } // corrupt file: start clean
         }
     }
@@ -53,7 +54,7 @@ class CacheStore(private val dir: File) {
             try {
                 // Write to a temp file first, so a crash never leaves a half-written file
                 val tmp = File(f.parentFile, f.name + ".tmp")
-                tmp.writeText(HsJson.encodeToString(data))
+                tmp.writeText(HsJson.encodeToString(serializer<T>(), data))
                 if (!tmp.renameTo(f)) { f.delete(); tmp.renameTo(f) }
             } catch (e: Exception) { /* cache is best effort */ }
         }
