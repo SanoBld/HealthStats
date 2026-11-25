@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">HealthStats</string>
+    <string name="rationale_title">Pourquoi ces autorisations ?</string>
+    <string name="rationale_body">HealthStats lit tes données Health Connect (séances, tracés GPS, fréquence cardiaque, sommeil, etc.) uniquement pour les afficher sur ton téléphone. Rien n\'est envoyé ailleurs ni modifié.</string>
+    <string name="rationale_close">Fermer</string>
+</resources>

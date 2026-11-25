@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">HealthStats</string>
+    <string name="rationale_title">Why these permissions?</string>
+    <string name="rationale_body">HealthStats reads your Health Connect data (workouts, GPS routes, heart rate, sleep, etc.) only to show it on your phone. Nothing is sent elsewhere or changed.</string>
+    <string name="rationale_close">Close</string>
+</resources>
