@@ -32,25 +32,21 @@ fun rememberHaptics(enabled: Boolean): () -> Unit {
     }
 }
 
-/** Shrinks a little while pressed, then springs back. */
-fun Modifier.pressScale(source: MutableInteractionSource, pressed: Float = 0.96f): Modifier = composed2(source, pressed)
-
+/** Shrinks a little while pressed, then springs back. Call it from a composable scope. */
 @Composable
-private fun pressValue(source: MutableInteractionSource, pressed: Float): Float {
+fun Modifier.pressScale(source: MutableInteractionSource, pressed: Float = 0.96f): Modifier {
+    // Read the animated value inside the graphicsLayer lambda so only the draw phase is invalidated
     val down by source.collectIsPressedAsState()
-    val v by animateFloatAsState(
+    val scale by animateFloatAsState(
         targetValue = if (down) pressed else 1f,
         animationSpec = spring(dampingRatio = 0.6f, stiffness = Spring.StiffnessMedium),
         label = "press",
     )
-    return v
-}
-
-private fun Modifier.composed2(source: MutableInteractionSource, pressed: Float): Modifier =
-    androidx.compose.ui.composed {
-        val s = pressValue(source, pressed)
-        graphicsLayer { scaleX = s; scaleY = s }
+    return this.graphicsLayer {
+        scaleX = scale
+        scaleY = scale
     }
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

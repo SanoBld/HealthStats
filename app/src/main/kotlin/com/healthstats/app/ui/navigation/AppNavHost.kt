@@ -17,7 +17,7 @@ import com.healthstats.app.ui.screens.onboarding.OnboardingScreen
 import com.healthstats.app.viewmodel.AppViewModel
 
 // Page transition: small slide up + fade, with a soft spring (Material 3 style)
-private val slide = spring<IntOffset>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset.VisibilityThreshold)
+private val slide = spring<IntOffset>(dampingRatio = 0.85f, stiffness = Spring.StiffnessMediumLow, visibilityThreshold = IntOffset(1, 1))
 
 @Composable
 fun AppNavHost(vm: AppViewModel, startOnboarded: Boolean) {
