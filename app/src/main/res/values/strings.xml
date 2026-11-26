@@ -1,7 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">HealthStats</string>
+    <string name="nav_dashboard">Home</string>
+    <string name="nav_activities">Activities</string>
+    <string name="nav_map">Map</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_charts">Charts</string>
+    <string name="nav_settings">Settings</string>
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Cancel</string>
+    <string name="back">Back</string>
     <string name="rationale_title">Why these permissions?</string>
     <string name="rationale_body">HealthStats reads your Health Connect data (workouts, GPS routes, heart rate, sleep, etc.) only to show it on your phone. Nothing is sent elsewhere or changed.</string>
     <string name="rationale_close">Close</string>
+    <string name="onb_start">Get started</string>
+    <string name="onb_continue">Continue</string>
+    <string name="onb_tagline">All your health data in one place.</string>
+    <string name="onb_f1">Workouts, routes and records</string>
+    <string name="onb_f2">Sleep, heart and recovery</string>
+    <string name="onb_f3">Everything stays on your phone</string>
+    <string name="onb_name_title">What should we call you?</string>
+    <string name="onb_name_sub">Your name is shown at the top of the dashboard.</string>
+    <string name="onb_name_label">Name</string>
+    <string name="onb_about_title">A bit about you</string>
+    <string name="onb_about_sub">Used to estimate calories and put your results in context. All optional.</string>
+    <string name="onb_height">Height (cm)</string>
+    <string name="onb_weight">Weight (kg)</string>
+    <string name="onb_birth">Birth date</string>
+    <string name="onb_sex">Sex</string>
+    <string name="sex_m">Male</string>
+    <string name="sex_f">Female</string>
+    <string name="sex_x">Other</string>
+    <string name="onb_goals_title">Your goals</string>
+    <string name="onb_goals_sub">You can change them any time in settings.</string>
+    <string name="onb_steps_day">Steps per day</string>
+    <string name="onb_workouts_week">Workouts per week</string>
+    <string name="onb_style_title">Your style</string>
+    <string name="onb_style_sub">Pick the look and what you want to see.</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="onb_dynamic">Dynamic colors (wallpaper)</string>
+    <string name="onb_advice">Show advice</string>
+    <string name="onb_hc_sub">HealthStats reads your workouts, GPS routes, steps, heart rate, sleep and weight. Nothing leaves your phone.</string>
+    <string name="hc_update">Update Health Connect from the Play Store.</string>
+    <string name="hc_unavailable">Health Connect is unavailable on this device.</string>
+    <string name="hc_denied">Android did not show the request. Open Health Connect to allow HealthStats.</string>
+    <string name="hc_allow">Allow access</string>
+    <string name="hc_later">Later</string>
+    <string name="hc_open_settings">Open Health Connect</string>
+    <string name="hc_open_store">Open Play Store</string>
+    <string name="sync_reading">Reading activities…</string>
+    <string name="sync_stats">Stats %1$d / %2$d…</string>
+    <string name="sync_totals">Steps, calories, distance…</string>
+    <string name="sync_history">History %1$d…</string>
+    <string name="err_timeout">Health Connect is not answering. Try again.</string>
+    <string name="err_stats">Incomplete stats: %1$s</string>
+    <string name="err_other">Error: %1$s</string>
+    <string name="status_activities">%1$d activities</string>
+    <string name="status_days">%1$d days of data</string>
+    <string name="status_last_sync">Last sync: %1$s</string>
+    <string name="status_never">Never synced</string>
+    <string name="sync_now">Sync now</string>
+    <string name="status_note">This screen is temporary: the final screen comes in the next step.</string>
+    <string name="hc_title" translatable="false">Health Connect</string>
 </resources>

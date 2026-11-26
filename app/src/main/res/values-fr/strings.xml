@@ -1,7 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name" translatable="false">HealthStats</string>
+    <string name="nav_dashboard">Accueil</string>
+    <string name="nav_activities">Activités</string>
+    <string name="nav_map">Carte</string>
+    <string name="nav_search">Recherche</string>
+    <string name="nav_charts">Graphiques</string>
+    <string name="nav_settings">Réglages</string>
+    <string name="common_ok">OK</string>
+    <string name="common_cancel">Annuler</string>
+    <string name="back">Retour</string>
     <string name="rationale_title">Pourquoi ces autorisations ?</string>
     <string name="rationale_body">HealthStats lit tes données Health Connect (séances, tracés GPS, fréquence cardiaque, sommeil, etc.) uniquement pour les afficher sur ton téléphone. Rien n\'est envoyé ailleurs ni modifié.</string>
     <string name="rationale_close">Fermer</string>
+    <string name="onb_start">Commencer</string>
+    <string name="onb_continue">Continuer</string>
+    <string name="onb_tagline">Toutes vos données de santé, au même endroit.</string>
+    <string name="onb_f1">Séances, trajets et records</string>
+    <string name="onb_f2">Sommeil, cœur et récupération</string>
+    <string name="onb_f3">Tout reste sur votre téléphone</string>
+    <string name="onb_name_title">Comment vous appelez-vous ?</string>
+    <string name="onb_name_sub">Votre prénom s\'affiche en haut du tableau de bord.</string>
+    <string name="onb_name_label">Prénom</string>
+    <string name="onb_about_title">Quelques infos sur vous</string>
+    <string name="onb_about_sub">Elles servent à estimer les calories et à situer vos résultats. Tout est facultatif.</string>
+    <string name="onb_height">Taille (cm)</string>
+    <string name="onb_weight">Poids (kg)</string>
+    <string name="onb_birth">Date de naissance</string>
+    <string name="onb_sex">Sexe</string>
+    <string name="sex_m">Homme</string>
+    <string name="sex_f">Femme</string>
+    <string name="sex_x">Autre</string>
+    <string name="onb_goals_title">Vos objectifs</string>
+    <string name="onb_goals_sub">Vous pourrez les changer à tout moment dans les réglages.</string>
+    <string name="onb_steps_day">Pas par jour</string>
+    <string name="onb_workouts_week">Séances par semaine</string>
+    <string name="onb_style_title">Votre style</string>
+    <string name="onb_style_sub">Choisissez l\'apparence et ce que vous voulez voir.</string>
+    <string name="theme_system">Système</string>
+    <string name="theme_light">Clair</string>
+    <string name="theme_dark">Sombre</string>
+    <string name="onb_dynamic">Couleurs dynamiques (fond d\'écran)</string>
+    <string name="onb_advice">Afficher les conseils</string>
+    <string name="onb_hc_sub">HealthStats lit vos séances, trajets GPS, pas, fréquence cardiaque, sommeil et poids. Rien ne quitte votre téléphone.</string>
+    <string name="hc_update">Mettez à jour Health Connect depuis le Play Store.</string>
+    <string name="hc_unavailable">Health Connect est indisponible sur cet appareil.</string>
+    <string name="hc_denied">Android n\'a pas affiché la demande. Ouvrez Health Connect pour autoriser HealthStats.</string>
+    <string name="hc_allow">Autoriser l\'accès</string>
+    <string name="hc_later">Plus tard</string>
+    <string name="hc_open_settings">Ouvrir Health Connect</string>
+    <string name="hc_open_store">Ouvrir le Play Store</string>
+    <string name="sync_reading">Lecture des activités…</string>
+    <string name="sync_stats">Statistiques %1$d / %2$d…</string>
+    <string name="sync_totals">Pas, calories, distance…</string>
+    <string name="sync_history">Historique %1$d…</string>
+    <string name="err_timeout">Health Connect ne répond pas. Réessayez.</string>
+    <string name="err_stats">Statistiques incomplètes : %1$s</string>
+    <string name="err_other">Erreur : %1$s</string>
+    <string name="status_activities">%1$d activités</string>
+    <string name="status_days">%1$d jours de données</string>
+    <string name="status_last_sync">Dernière synchro : %1$s</string>
+    <string name="status_never">Jamais synchronisé</string>
+    <string name="sync_now">Synchroniser</string>
+    <string name="status_note">Cet écran est temporaire : l\'écran final arrive à l\'étape suivante.</string>
+    <string name="hc_title" translatable="false">Health Connect</string>
 </resources>

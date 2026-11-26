@@ -16,6 +16,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicBoolean
 
 enum class SyncStage { Idle, ReadingActivities, ComputingStats, Totals, History }
 
@@ -75,6 +76,8 @@ class HealthRepository(
     private val hrChecked = ConcurrentHashMap<String, Long>()
     private val noTrack = ConcurrentHashMap.newKeySet<String>()
 
+    private val running = AtomicBoolean(false) // only one sync at a time
+
     private class SyncTimeout : Exception()
 
     /** Ids of the other copies merged into [id]. */
@@ -126,6 +129,7 @@ class HealthRepository(
     fun sync(daysBack: Int = ALL_DAYS) {
         val s = _state.value
         if (s.loading || !s.permitted) return
+        if (!running.compareAndSet(false, true)) return
         scope.launch { doSync(daysBack) }
     }
 
@@ -213,6 +217,7 @@ class HealthRepository(
             _state.update { it.copy(error = SyncError(SyncError.Kind.Other, e.message ?: e.toString())) }
         } finally {
             _state.update { it.copy(loading = false, progress = SyncProgress()) }
+            running.set(false)
         }
     }
 
