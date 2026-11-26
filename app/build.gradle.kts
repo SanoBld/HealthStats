@@ -25,27 +25,26 @@ android {
     }
 
     // Same signature on every build, so updates install over the old app.
-    // Put the old debug.keystore in app/. If it is missing, Gradle uses its default debug key.
+    // app/debug.keystore is committed to the repo on purpose: CI runners are empty machines and
+    // would otherwise create a new random debug key at each run (= "app not installed" on update).
     signingConfigs {
         create("shared") {
-            val ks = file("debug.keystore")
-            if (ks.exists()) {
-                storeFile = ks
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
     }
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName(if (file("debug.keystore").exists()) "shared" else "debug")
+            signingConfig = signingConfigs.getByName("shared")
         }
         release {
-            signingConfig = signingConfigs.getByName(if (file("debug.keystore").exists()) "shared" else "debug")
-            isMinifyEnabled = true
-            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("shared")
+            // R8 is off: a shrunk release build crashed at start. Turn it back on only with a logcat to test it.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

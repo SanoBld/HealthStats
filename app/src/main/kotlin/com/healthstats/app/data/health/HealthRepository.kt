@@ -95,24 +95,32 @@ class HealthRepository(
 
     /** Loads saved data, then checks Health Connect. Call once at app start. */
     suspend fun init() {
-        val c = cache.loadCache()
-        if (c != null) {
-            statsOk.addAll(c.statsOk)
-            hrChecked.putAll(c.hrChecked)
-            setRaw { c.workouts }
-            _state.update { it.copy(days = c.days, lastSync = c.lastSync, hrGeneral = c.hrGeneral) }
+        try {
+            val c = cache.loadCache()
+            if (c != null) {
+                statsOk.addAll(c.statsOk)
+                hrChecked.putAll(c.hrChecked)
+                setRaw { c.workouts }
+                _state.update { it.copy(days = c.days, lastSync = c.lastSync, hrGeneral = c.hrGeneral) }
+            }
+            cache.loadTracks()?.let { t ->
+                noTrack.addAll(t.noTrack)
+                _state.update { it.copy(tracks = t.tracks) }
+            }
+            refreshStatus()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            // Never crash at start: the app opens with empty data and the user can sync again
+        } finally {
+            // The splash screen waits for this flag, so it must always be set
+            _state.update { it.copy(ready = true) }
         }
-        cache.loadTracks()?.let { t ->
-            noTrack.addAll(t.noTrack)
-            _state.update { it.copy(tracks = t.tracks) }
-        }
-        refreshStatus()
-        _state.update { it.copy(ready = true) }
     }
 
     /** Status of Health Connect + permissions granted right now. Call again when the app comes back to the screen. */
     suspend fun refreshStatus() {
-        val st = hc.status()
+        val st = try { hc.status() } catch (e: Exception) { HcStatus.Unavailable }
         val granted = if (st == HcStatus.Available) {
             try { hc.granted() } catch (e: Exception) { emptySet() }
         } else emptySet()
