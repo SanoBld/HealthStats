@@ -45,7 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.healthstats.app.R
 import com.healthstats.app.ui.components.DateField
-import com.healthstats.app.ui.components.MorphLoader
+import com.healthstats.app.ui.components.CookieLoader
 
 private const val LAST_STEP = 3
 
@@ -94,7 +94,7 @@ fun OnboardingScreen(
             ) {
                 when (s) {
                     0 -> {
-                        MorphLoader(size = 88.dp)
+                        CookieLoader(progress = null, size = 96.dp)
                         Spacer(Modifier.height(8.dp))
                         Text(stringResource(R.string.app_name), style = MaterialTheme.typography.displaySmall)
                         Text(stringResource(R.string.onb_tagline), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

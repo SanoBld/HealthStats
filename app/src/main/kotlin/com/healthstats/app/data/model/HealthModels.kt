@@ -45,13 +45,34 @@ data class DayStat(
 /** One GPS point. [alt] is NaN when unknown, [time] is 0 when unknown. */
 data class RoutePoint(val lat: Double, val lng: Double, val alt: Double = Double.NaN, val time: Long = 0L)
 
+@Serializable
 data class TimedValue(val time: Long, val value: Double)
 
-/** Last known values shown on the home screen. */
-data class Latest(
-    val restingHr: Double? = null,
-    val weightKg: Double? = null,
-    val sleepMinutes: Long? = null,
+/** One night of sleep (minutes). Stages are 0 when the app that wrote the sleep has no stages. */
+@Serializable
+data class SleepNight(
+    val endMs: Long,
+    val totalMin: Long,
+    val deepMin: Long = 0,
+    val remMin: Long = 0,
+    val lightMin: Long = 0,
+    val awakeMin: Long = 0,
+)
+
+/** Heart rate of one day (bpm). */
+@Serializable
+data class HrDay(val epochDay: Long, val avg: Int, val min: Int, val max: Int)
+
+/** Everything besides workouts and daily totals. Lists are oldest first. */
+@Serializable
+data class BodyMetrics(
+    val sleep: List<SleepNight> = emptyList(),
+    val restingHr: List<TimedValue> = emptyList(),
+    val weight: List<TimedValue> = emptyList(),   // kg
+    val hrv: List<TimedValue> = emptyList(),      // ms
+    val spo2: List<TimedValue> = emptyList(),     // %
+    val vo2: List<TimedValue> = emptyList(),      // ml/min/kg
+    val hrDays: List<HrDay> = emptyList(),
 )
 
 enum class HcStatus { Available, UpdateRequired, Unavailable }

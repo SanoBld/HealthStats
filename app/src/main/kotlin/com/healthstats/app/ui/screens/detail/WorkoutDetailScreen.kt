@@ -47,6 +47,7 @@ import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.data.model.TimedValue
 import com.healthstats.app.data.model.Workout
 import com.healthstats.app.data.model.sourceLabel
+import com.healthstats.app.ui.components.AppScreen
 import com.healthstats.app.ui.components.BarChart
 import com.healthstats.app.ui.components.ExplainedCard
 import com.healthstats.app.ui.components.LineChart
@@ -105,16 +106,12 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
     val lMax = stringResource(R.string.detail_hr_max)
     val lMin = stringResource(R.string.detail_hr_min)
 
-    // Content stays readable on tablets: centered, at most 720 dp wide
-    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+    AppScreen(workout?.sport?.name ?: "", onBack = onBack) { inner ->
     LazyColumn(
-        Modifier.widthIn(max = 720.dp),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = top + 8.dp, bottom = bottom + 24.dp),
+        Modifier.padding(inner),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = bottom + 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
-            IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
-        }
         if (workout == null) return@LazyColumn
         val sport = workout.sport
         val foot = workout.type in FootSports

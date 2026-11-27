@@ -6,7 +6,10 @@ import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
 import androidx.health.connect.client.records.DistanceRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
 import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.PowerRecord
 import androidx.health.connect.client.records.SleepSessionRecord
@@ -38,7 +41,29 @@ object HealthPermissions {
         HealthPermission.getReadPermission(SpeedRecord::class),
         HealthPermission.getReadPermission(PowerRecord::class),
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+        HealthPermission.getReadPermission(OxygenSaturationRecord::class),
+        HealthPermission.getReadPermission(Vo2MaxRecord::class),
         HISTORY,
+    )
+
+    /** Short name of each data type and its permission (used by the access check in Settings). */
+    val NAMED: List<Pair<String, String>> = listOf(
+        "exercise" to EXERCISE,
+        "steps" to HealthPermission.getReadPermission(StepsRecord::class),
+        "heart_rate" to HealthPermission.getReadPermission(HeartRateRecord::class),
+        "distance" to HealthPermission.getReadPermission(DistanceRecord::class),
+        "kcal" to HealthPermission.getReadPermission(ActiveCaloriesBurnedRecord::class),
+        "sleep" to HealthPermission.getReadPermission(SleepSessionRecord::class),
+        "weight" to HealthPermission.getReadPermission(WeightRecord::class),
+        "height" to HealthPermission.getReadPermission(HeightRecord::class),
+        "resting" to HealthPermission.getReadPermission(RestingHeartRateRecord::class),
+        "hrv" to HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
+        "spo2" to HealthPermission.getReadPermission(OxygenSaturationRecord::class),
+        "vo2" to HealthPermission.getReadPermission(Vo2MaxRecord::class),
+        "speed" to HealthPermission.getReadPermission(SpeedRecord::class),
+        "power" to HealthPermission.getReadPermission(PowerRecord::class),
+        "history" to HISTORY,
     )
 
     /** Use with rememberLauncherForActivityResult: input = permissions to ask, output = permissions granted. */

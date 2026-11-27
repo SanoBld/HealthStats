@@ -37,7 +37,7 @@ import com.healthstats.app.data.model.sportOf
 import com.healthstats.app.ui.components.BarChart
 import com.healthstats.app.ui.components.EmptyState
 import com.healthstats.app.ui.components.ExplainedCard
-import com.healthstats.app.ui.components.LargeScreen
+import com.healthstats.app.ui.components.AppScreen
 import com.healthstats.app.ui.components.LineChart
 import com.healthstats.app.ui.components.SportBadge
 import com.healthstats.app.ui.components.TileGrid
@@ -102,7 +102,7 @@ fun SportScreen(
     val lMax = stringResource(R.string.detail_hr_max)
     val lKcal = stringResource(R.string.detail_kcal)
 
-    LargeScreen(sport.name, onBack = onBack) { inner ->
+    AppScreen(sport.name, onBack = onBack) { inner ->
         Column(
             Modifier.padding(inner).verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = bottom + 24.dp),

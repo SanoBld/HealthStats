@@ -9,7 +9,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import com.healthstats.app.data.model.sportOf
-import com.healthstats.app.ui.components.LargeScreen
+import com.healthstats.app.ui.components.AppScreen
+import com.healthstats.app.ui.components.FullLoader
+import com.healthstats.app.ui.components.SyncAction
+import com.healthstats.app.ui.components.syncText
 import com.healthstats.app.ui.components.SportBadge
 import com.healthstats.app.ui.components.springClick
 import com.healthstats.app.ui.theme.groupedShape
@@ -126,7 +129,7 @@ private fun format(metric: ChartMetric, v: Float): String = when (metric) {
 }
 
 @Composable
-fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) -> Unit, onOpenSport: (Int) -> Unit) {
+fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) -> Unit, onOpenSport: (Int) -> Unit, onSync: () -> Unit) {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var metricIdx by rememberSaveable { mutableIntStateOf(0) }
     var period by rememberSaveable { mutableIntStateOf(30) } // 0 = all
@@ -147,7 +150,13 @@ fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) 
     val avg = if (metric == ChartMetric.Workouts) total / (series.windowDays / 7f).coerceAtLeast(1f) else total / series.windowDays
     val periods = listOf(7 to R.string.charts_7d, 30 to R.string.charts_30d, 90 to R.string.charts_90d, 365 to R.string.charts_1y, 0 to R.string.act_all)
 
-    LargeScreen(stringResource(R.string.charts_title)) { inner ->
+    val full = health.syncing && health.days.isEmpty() && health.workouts.isEmpty()
+    val syncLabel = syncText(health)
+    AppScreen(stringResource(R.string.charts_title), actions = { SyncAction(health, full, onSync) }) { inner ->
+    if (full) {
+        FullLoader(health.progress, syncLabel, Modifier.padding(inner))
+        return@AppScreen
+    }
     Column(
         Modifier.padding(inner).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.healthstats.app.ui.theme.spatialSpring
 import kotlin.math.abs
@@ -40,6 +41,7 @@ fun BarChart(
     selected: Int?,
     onSelect: (Int?) -> Unit,
     modifier: Modifier = Modifier,
+    height: Dp = 180.dp,
 ) {
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, spatialSpring()) }
@@ -49,7 +51,7 @@ fun BarChart(
         Canvas(
             Modifier
                 .fillMaxWidth()
-                .height(180.dp)
+                .height(height)
                 .pointerInput(values.size) {
                     detectTapGestures { off ->
                         if (values.isNotEmpty()) select((off.x / size.width * values.size).toInt().coerceIn(0, values.size - 1))
@@ -99,12 +101,13 @@ fun LineChart(
     cursor: Float?,
     onCursor: (Float?) -> Unit,
     modifier: Modifier = Modifier,
+    height: Dp = 150.dp,
 ) {
     val update by rememberUpdatedState(onCursor)
     Canvas(
         modifier
             .fillMaxWidth()
-            .height(150.dp)
+            .height(height)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onTap = { off -> update((off.x / size.width).coerceIn(0f, 1f)) },

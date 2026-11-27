@@ -174,4 +174,47 @@ La dérive cardiaque compare la 2e moitié de la séance à la 1re. Moins de 5 %
     <string name="charts_expl_distance">Distance marchée, courue ou parcourue, en kilomètres.</string>
     <string name="charts_expl_workouts">Nombre de séances. La régularité compte plus qu\'une grosse séance.</string>
     <string name="charts_expl_hr">FC moyenne de vos séances. Une valeur plus basse pour le même effort = vous progressez.</string>
+    <string name="sync_body">Sommeil, cœur, poids…</string>
+    <string name="home_steps_week">7 derniers jours</string>
+    <string name="home_steps_expl">Pas des 7 derniers jours. Touchez une barre pour voir le jour.</string>
+    <string name="sleep_title">Sommeil</string>
+    <string name="sleep_deep">Profond</string>
+    <string name="sleep_rem">REM</string>
+    <string name="sleep_light">Léger</string>
+    <string name="sleep_awake">Éveillé</string>
+    <string name="sleep_expl">Temps de sommeil chaque nuit. Le sommeil profond repose le corps, le REM aide la mémoire et l\'humeur, le léger sert de transition. Un adulte a besoin d\'environ 7 à 9 heures.</string>
+    <string name="heart_title">Cœur</string>
+    <string name="heart_avg_title">FC par jour</string>
+    <string name="heart_expl">Votre FC au repos chaque jour. Une valeur qui baisse avec le temps signe en général une meilleure forme ; une hausse soudaine peut venir du stress, d\'une maladie ou d\'un mauvais sommeil.</string>
+    <string name="heart_avg_expl">FC moyenne de chaque jour.</string>
+    <string name="heart_today_avg">Moy. aujourd\'hui</string>
+    <string name="heart_today_min">Min</string>
+    <string name="heart_today_max">Max</string>
+    <string name="hrv_title">VFC</string>
+    <string name="spo2_title">Oxygène (SpO₂)</string>
+    <string name="vo2_title">VO₂ max</string>
+    <string name="body_title">Corps</string>
+    <string name="weight_title">Poids</string>
+    <string name="body_expl" formatted="false">Poids dans le temps. Regardez la tendance sur plusieurs semaines, pas un jour : l\'eau et les repas le font bouger d\'un ou deux kilos. La VO₂ max mesure votre forme, la SpO₂ l\'oxygène dans le sang (normalement 95 % ou plus), la VFC votre récupération.</string>
+    <string name="set_diag">Accès Health Connect</string>
+    <string name="diag_sub">Ce que l\'app peut lire, et ce qu\'elle a trouvé à la dernière synchro.</string>
+    <string name="diag_denied">Non autorisé</string>
+    <string name="diag_none">Autorisé, pas de données</string>
+    <string name="diag_found">%1$d trouvés</string>
+    <string name="diag_ok">Autorisé</string>
+    <string name="dt_exercise">Séances</string>
+    <string name="dt_steps">Pas</string>
+    <string name="dt_heart_rate">Fréquence cardiaque</string>
+    <string name="dt_distance">Distance</string>
+    <string name="dt_kcal">Calories</string>
+    <string name="dt_sleep">Sommeil</string>
+    <string name="dt_weight">Poids</string>
+    <string name="dt_height">Taille</string>
+    <string name="dt_resting">FC au repos</string>
+    <string name="dt_hrv">Variabilité cardiaque</string>
+    <string name="dt_spo2">Saturation en oxygène</string>
+    <string name="dt_vo2">VO₂ max</string>
+    <string name="dt_speed">Vitesse</string>
+    <string name="dt_power">Puissance</string>
+    <string name="dt_history">Historique complet</string>
 </resources>

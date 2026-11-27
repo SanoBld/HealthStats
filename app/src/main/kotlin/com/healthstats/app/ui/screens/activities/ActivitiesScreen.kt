@@ -34,8 +34,10 @@ import com.healthstats.app.data.model.SportInfo
 import com.healthstats.app.data.model.sourceLabel
 import com.healthstats.app.data.model.sportOf
 import com.healthstats.app.ui.components.EmptyState
-import com.healthstats.app.ui.components.LargeScreen
-import com.healthstats.app.ui.components.LoadingBlock
+import com.healthstats.app.ui.components.AppScreen
+import com.healthstats.app.ui.components.FullLoader
+import com.healthstats.app.ui.components.SyncAction
+import com.healthstats.app.ui.components.syncText
 import com.healthstats.app.ui.components.SportSummaryCard
 import com.healthstats.app.ui.components.WorkoutRow
 import com.healthstats.app.ui.components.appear
@@ -45,7 +47,7 @@ import com.healthstats.app.util.fmtMonth
 private class TypeStat(val type: Int, val count: Int, val sec: Long)
 
 @Composable
-fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: (String) -> Unit, onOpenSport: (Int) -> Unit) {
+fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: (String) -> Unit, onOpenSport: (Int) -> Unit, onSync: () -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var sportFilter by rememberSaveable { mutableStateOf(-1) } // -1 = all
 
@@ -65,7 +67,14 @@ fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: 
     val grouped = remember(filtered) { filtered.groupBy { fmtMonth(it.start) } }
     val allSport = remember { SportInfo("Tout", "All", Icons.Rounded.FitnessCenter, androidx.compose.ui.graphics.Color(0xFF8E8E93)) }
 
-    LargeScreen(stringResource(R.string.act_title)) { inner ->
+    val full = health.syncing && health.workouts.isEmpty()
+    val syncLabel = syncText(health)
+
+    AppScreen(stringResource(R.string.act_title), actions = { SyncAction(health, full, onSync) }) { inner ->
+        if (full) {
+            FullLoader(health.progress, syncLabel, Modifier.padding(inner))
+            return@AppScreen
+        }
         LazyColumn(
             Modifier.padding(inner),
             contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
@@ -118,9 +127,7 @@ fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: 
                     ) { Text(stringResource(R.string.sport_view)) }
                 }
             }
-            if (health.loading && health.workouts.isEmpty()) {
-                item { LoadingBlock(stringResource(R.string.sync_reading), Modifier.padding(vertical = 32.dp)) }
-            } else if (filtered.isEmpty()) {
+            if (filtered.isEmpty()) {
                 item { EmptyState(Icons.Rounded.FitnessCenter, stringResource(R.string.act_empty)) }
             }
             grouped.forEach { (month, list) ->

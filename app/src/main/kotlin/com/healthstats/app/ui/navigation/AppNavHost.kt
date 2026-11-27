@@ -201,9 +201,9 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
                 )
             }
             composable(Routes.Activities) {
-                ActivitiesScreen(settings, health, { nav.navigate(Routes.detail(it)) }, { nav.navigate(Routes.sport(it)) })
+                ActivitiesScreen(settings, health, { nav.navigate(Routes.detail(it)) }, { nav.navigate(Routes.sport(it)) }, { vm.sync() })
             }
-            composable(Routes.Charts) { ChartsScreen(health, settings.sportColors, { nav.navigate(Routes.detail(it)) }, { nav.navigate(Routes.sport(it)) }) }
+            composable(Routes.Charts) { ChartsScreen(health, settings.sportColors, { nav.navigate(Routes.detail(it)) }, { nav.navigate(Routes.sport(it)) }, { vm.sync() }) }
             composable(Routes.Settings) { SettingsScreen(settings, health, vm, connect) }
             composable(
                 Routes.Sport,

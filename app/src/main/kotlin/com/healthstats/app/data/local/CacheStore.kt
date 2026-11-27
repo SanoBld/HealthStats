@@ -1,6 +1,7 @@
 package com.healthstats.app.data.local
 
 import android.content.Context
+import com.healthstats.app.data.model.BodyMetrics
 import com.healthstats.app.data.model.DayStat
 import com.healthstats.app.data.model.Workout
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +15,7 @@ data class CacheData(
     val workouts: List<Workout> = emptyList(),
     val days: List<DayStat> = emptyList(),
     val lastSync: Long = 0L,
+    val metrics: BodyMetrics = BodyMetrics(),
 )
 
 /** Saves the last sync in one JSON file so the app opens with data at once. */

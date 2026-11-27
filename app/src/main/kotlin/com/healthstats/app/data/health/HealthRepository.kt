@@ -4,7 +4,7 @@ import com.healthstats.app.data.local.CacheData
 import com.healthstats.app.data.local.CacheStore
 import com.healthstats.app.data.model.DayStat
 import com.healthstats.app.data.model.HcStatus
-import com.healthstats.app.data.model.Latest
+import com.healthstats.app.data.model.BodyMetrics
 import com.healthstats.app.data.model.RoutePoint
 import com.healthstats.app.data.model.RouteResult
 import com.healthstats.app.data.model.TimedValue
@@ -32,9 +32,11 @@ data class SyncError(val timeout: Boolean, val detail: String = "")
 data class HealthState(
     val workouts: List<Workout> = emptyList(), // merged, newest first
     val days: List<DayStat> = emptyList(),     // oldest first
-    val latest: Latest = Latest(),
+    val metrics: BodyMetrics = BodyMetrics(),
+    val progress: Float = 0f,                  // 0..1 of the whole sync
+    val granted: Set<String> = emptySet(),
     val loading: Boolean = false,
-    val loadingStage: Int = 0,                 // 0 none, 1 reading workouts, 2 reading daily totals
+    val loadingStage: Int = 0,                 // 1 workouts, 2 daily totals, 3 sleep/heart/body, 4 workout stats
     val enriching: Boolean = false,
     val statsDone: Int = 0,
     val statsTotal: Int = 0,
@@ -43,7 +45,10 @@ data class HealthState(
     val permitted: Boolean = false,
     val lastSync: Long = 0L,
     val ready: Boolean = false,                // saved data is loaded (never blocks the UI)
-)
+) {
+    /** True while any part of a sync is running. */
+    val syncing: Boolean get() = loading || enriching
+}
 
 /** Holds the app data and does the sync. Screens only read [state]. */
 class HealthRepository(
@@ -77,7 +82,7 @@ class HealthRepository(
         try {
             cache.load()?.let { c ->
                 setRaw { c.workouts }
-                _state.update { it.copy(days = c.days, lastSync = c.lastSync) }
+                _state.update { it.copy(days = c.days, lastSync = c.lastSync, metrics = c.metrics) }
             }
             refreshStatus()
         } catch (e: CancellationException) {
@@ -92,15 +97,16 @@ class HealthRepository(
     /** Health Connect status + permissions right now. Call again when the app comes back to the screen. */
     suspend fun refreshStatus() {
         val st = try { hc.status() } catch (e: Exception) { HcStatus.Unavailable }
-        val ok = if (st == HcStatus.Available) {
-            try { HealthPermissions.EXERCISE in hc.granted() } catch (e: CancellationException) { throw e } catch (e: Exception) { false }
-        } else false
-        _state.update { it.copy(status = st, permitted = ok) }
+        val g: Set<String> = if (st == HcStatus.Available) {
+            try { hc.granted() } catch (e: CancellationException) { throw e } catch (e: Exception) { emptySet() }
+        } else emptySet()
+        _state.update { it.copy(status = st, granted = g, permitted = HealthPermissions.EXERCISE in g) }
     }
 
     /** Call with the result of the permission dialog. */
     fun onPermissionsResult(granted: Set<String>) {
-        _state.update { it.copy(permitted = HealthPermissions.EXERCISE in granted) }
+        val g = granted.filter { it in HealthPermissions.ALL }.toSet()
+        _state.update { it.copy(permitted = HealthPermissions.EXERCISE in g, granted = g) }
     }
 
     suspend fun heightCm(): Int = hc.heightCm()
@@ -121,11 +127,15 @@ class HealthRepository(
         }
     }
 
+    private fun progress(p: Float, stage: Int = -1) {
+        _state.update { it.copy(progress = p.coerceIn(0f, 1f), loadingStage = if (stage >= 0) stage else it.loadingStage) }
+    }
+
     private suspend fun runSync() {
-        _state.update { it.copy(loading = true, loadingStage = 1, error = null, statsDone = 0, statsTotal = 0) }
+        _state.update { it.copy(loading = true, loadingStage = 1, progress = 0.02f, error = null, statsDone = 0, statsTotal = 0) }
         val now = System.currentTimeMillis()
         try {
-            // 1) All workouts, no stats yet: the list shows up at once
+            // 1) All workouts, no stats yet: the list shows up at once (0 - 20 %)
             val sessions = withTimeout(90_000) { hc.sessions(0L, now) }
             val old = synchronized(rawLock) { raw.associateBy { it.id } }
             setRaw {
@@ -136,22 +146,26 @@ class HealthRepository(
                     } else n
                 }
             }
+            progress(0.2f, 2)
 
-            // 2) Daily totals
-            _state.update { it.copy(loadingStage = 2) }
+            // 2) Daily totals: steps, distance, calories (20 - 50 %)
             val earliest = sessions.minOfOrNull { it.start } ?: now
             val from = maxOf(now - 5 * 365 * DAY_MS, minOf(earliest, now - 365 * DAY_MS))
-            val days = withTimeoutOrNull(180_000) { hc.daily(from, now) } ?: emptyList()
-            _state.update { it.copy(days = days.sortedBy { d -> d.epochDay }, lastSync = now, loading = false, loadingStage = 0) }
+            val days = withTimeoutOrNull(180_000) { hc.daily(from, now) { f -> progress(0.2f + 0.3f * f) } } ?: emptyList()
+            _state.update { it.copy(days = days.sortedBy { d -> d.epochDay }, lastSync = now) }
+            progress(0.5f, 3)
+
+            // 3) Sleep, resting heart rate, weight, HRV, oxygen, VO2 max (50 - 60 %)
+            val metrics = withTimeoutOrNull(90_000) { hc.metrics() }
+            if (metrics != null) _state.update { it.copy(metrics = metrics) }
+            _state.update { it.copy(loading = false) }
+            progress(0.6f)
             persist()
 
-            // 3) Latest values (resting heart rate, weight, sleep)
-            val latest = withTimeoutOrNull(30_000) { hc.latest() }
-            if (latest != null) _state.update { it.copy(latest = latest) }
-
-            // 4) Stats of each workout, newest first, in the background
+            // 4) Stats of each workout, newest first, in the background (60 - 100 %)
             enrich()
             persist()
+            progress(1f)
         } catch (e: TimeoutCancellationException) {
             _state.update { it.copy(error = SyncError(timeout = true)) }
         } catch (e: CancellationException) {
@@ -164,7 +178,7 @@ class HealthRepository(
     private suspend fun enrich() {
         val pending = synchronized(rawLock) { raw.filter { !it.statsDone }.sortedByDescending { it.start } }
         if (pending.isEmpty()) return
-        _state.update { it.copy(enriching = true, statsDone = 0, statsTotal = pending.size) }
+        _state.update { it.copy(enriching = true, loadingStage = 4, statsDone = 0, statsTotal = pending.size) }
         var done = 0
         for (chunk in pending.chunked(6)) {
             val results = coroutineScope {
@@ -174,6 +188,7 @@ class HealthRepository(
             setRaw { list -> list.map { byId[it.id] ?: it } }
             done += chunk.size
             _state.update { it.copy(statsDone = done) }
+            progress(0.6f + 0.4f * done / pending.size)
         }
         _state.update { it.copy(enriching = false) }
     }
@@ -181,7 +196,7 @@ class HealthRepository(
     private suspend fun persist() {
         val s = _state.value
         val list = synchronized(rawLock) { raw }
-        cache.save(CacheData(list, s.days, s.lastSync))
+        cache.save(CacheData(list, s.days, s.lastSync, s.metrics))
     }
 
     // ---- Detail screen helpers ----
@@ -222,6 +237,6 @@ class HealthRepository(
         cache.clear()
         synchronized(rawLock) { raw = emptyList() }
         routes.clear()
-        _state.update { it.copy(workouts = emptyList(), days = emptyList(), latest = Latest(), lastSync = 0L, error = null) }
+        _state.update { it.copy(workouts = emptyList(), days = emptyList(), metrics = BodyMetrics(), lastSync = 0L, error = null) }
     }
 }

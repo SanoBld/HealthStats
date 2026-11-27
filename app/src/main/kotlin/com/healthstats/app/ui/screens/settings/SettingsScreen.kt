@@ -47,8 +47,14 @@ import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.data.local.SettingsStore.Keys
 import com.healthstats.app.data.local.ThemeMode
 import com.healthstats.app.ui.components.DateField
-import com.healthstats.app.ui.components.LargeScreen
-import com.healthstats.app.ui.components.MorphLoader
+import com.healthstats.app.ui.components.AppScreen
+import com.healthstats.app.ui.components.SyncAction
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Cancel
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material3.Icon
+import androidx.compose.foundation.layout.size
+import com.healthstats.app.data.health.HealthPermissions
 import com.healthstats.app.util.fmtInt
 import com.healthstats.app.util.openHealthConnect
 import com.healthstats.app.util.openLanguageSettings
@@ -94,7 +100,7 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
     var confirmClear by remember { mutableStateOf(false) }
     val clearedMsg = stringResource(R.string.set_clear_done)
 
-    LargeScreen(stringResource(R.string.set_title)) { inner ->
+    AppScreen(stringResource(R.string.set_title), actions = { SyncAction(health, false) { vm.sync() } }) { inner ->
     Column(
         Modifier.padding(inner).imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
@@ -170,6 +176,52 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
             TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.set_clear_cache)) }
         }
 
+        Section(stringResource(R.string.set_diag)) {
+            Text(stringResource(R.string.diag_sub), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            val perms = HealthPermissions.NAMED.toMap()
+            val m = health.metrics
+            val rows = listOf(
+                Triple(R.string.dt_exercise, "exercise", health.workouts.size),
+                Triple(R.string.dt_steps, "steps", health.days.count { it.steps > 0 }),
+                Triple(R.string.dt_heart_rate, "heart_rate", m.hrDays.size),
+                Triple(R.string.dt_distance, "distance", health.days.count { it.distanceM > 0 }),
+                Triple(R.string.dt_kcal, "kcal", health.days.count { it.kcal > 0 }),
+                Triple(R.string.dt_sleep, "sleep", m.sleep.size),
+                Triple(R.string.dt_weight, "weight", m.weight.size),
+                Triple(R.string.dt_height, "height", -1),
+                Triple(R.string.dt_resting, "resting", m.restingHr.size),
+                Triple(R.string.dt_hrv, "hrv", m.hrv.size),
+                Triple(R.string.dt_spo2, "spo2", m.spo2.size),
+                Triple(R.string.dt_vo2, "vo2", m.vo2.size),
+                Triple(R.string.dt_speed, "speed", -1),
+                Triple(R.string.dt_power, "power", -1),
+                Triple(R.string.dt_history, "history", -1),
+            )
+            rows.forEach { (label, key, count) ->
+                val ok = perms[key] in health.granted
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(
+                        if (ok) Icons.Rounded.CheckCircle else Icons.Rounded.Cancel, null, Modifier.size(22.dp),
+                        tint = if (ok) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+                    )
+                    Text(stringResource(label), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+                    Text(
+                        when {
+                            !ok -> stringResource(R.string.diag_denied)
+                            count < 0 -> stringResource(R.string.diag_ok)
+                            count == 0 -> stringResource(R.string.diag_none)
+                            else -> stringResource(R.string.diag_found, count)
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (ok) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
+            if (rows.any { perms[it.second] !in health.granted }) {
+                Button(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
+            }
+        }
+
         Section(stringResource(R.string.set_intervals)) {
             Text(stringResource(R.string.set_intervals_sub), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             OutlinedTextField(
@@ -198,7 +250,7 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
                     enabled = intervalsKey.isNotEmpty() && testState != 1,
                 ) { Text(stringResource(R.string.set_intervals_test)) }
                 when (testState) {
-                    1 -> MorphLoader(size = 24.dp)
+                    1 -> Text("…", style = MaterialTheme.typography.titleMedium)
                     2 -> Text(stringResource(R.string.set_intervals_ok), color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodyMedium)
                     3 -> Text(stringResource(R.string.set_intervals_fail), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
                 }

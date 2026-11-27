@@ -9,7 +9,10 @@ import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.HeartRateVariabilityRmssdRecord
+import androidx.health.connect.client.records.OxygenSaturationRecord
 import androidx.health.connect.client.records.PowerRecord
+import androidx.health.connect.client.records.Vo2MaxRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
 import androidx.health.connect.client.records.SpeedRecord
@@ -25,7 +28,9 @@ import androidx.health.connect.client.time.TimeRangeFilter
 import androidx.health.connect.client.aggregate.AggregationResult
 import com.healthstats.app.data.model.DayStat
 import com.healthstats.app.data.model.HcStatus
-import com.healthstats.app.data.model.Latest
+import com.healthstats.app.data.model.BodyMetrics
+import com.healthstats.app.data.model.HrDay
+import com.healthstats.app.data.model.SleepNight
 import com.healthstats.app.data.model.RoutePoint
 import com.healthstats.app.data.model.RouteResult
 import com.healthstats.app.data.model.TimedValue
@@ -36,6 +41,7 @@ import java.time.Duration
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.Period
+import java.time.temporal.ChronoUnit
 import java.time.ZoneId
 import kotlin.reflect.KClass
 
@@ -217,12 +223,14 @@ class HealthConnectManager(private val ctx: Context) {
     // ---- Daily totals ----
 
     /** Daily totals between two dates, read in chunks of 120 days. */
-    suspend fun daily(startMs: Long, endMs: Long): List<DayStat> {
+    suspend fun daily(startMs: Long, endMs: Long, onProgress: (Float) -> Unit = {}): List<DayStat> {
         val zone = ZoneId.systemDefault()
         val from = LocalDateTime.ofInstant(Instant.ofEpochMilli(clampStart(startMs)), zone).toLocalDate().atStartOfDay()
         val to = LocalDateTime.ofInstant(Instant.ofEpochMilli(endMs), zone).toLocalDate().plusDays(1).atStartOfDay()
         val out = ArrayList<DayStat>()
         var a = from
+        var done = 0
+        val chunks = (ChronoUnit.DAYS.between(from, to) / 120 + 1).toInt()
         while (a.isBefore(to)) {
             val next = a.plusDays(120)
             val b = if (next.isBefore(to)) next else to
@@ -256,30 +264,106 @@ class HealthConnectManager(private val ctx: Context) {
                 )
             }
             a = b
+            done++
+            onProgress((done.toFloat() / chunks).coerceAtMost(1f))
         }
         return out
     }
 
-    // ---- Latest values ----
+    // ---- Sleep, heart, body ----
 
-    suspend fun latest(): Latest {
-        val now = Instant.now()
-        val rhr = safe {
-            client.readRecords(
-                ReadRecordsRequest(RestingHeartRateRecord::class, TimeRangeFilter.before(now), ascendingOrder = false, pageSize = 1)
-            ).records.firstOrNull()?.beatsPerMinute?.toDouble()
-        }
-        val weight = safe {
-            client.readRecords(
-                ReadRecordsRequest(WeightRecord::class, TimeRangeFilter.before(now), ascendingOrder = false, pageSize = 1)
-            ).records.firstOrNull()?.weight?.inKilograms
-        }
-        val sleep = safe {
-            client.readRecords(
-                ReadRecordsRequest(SleepSessionRecord::class, TimeRangeFilter.before(now), ascendingOrder = false, pageSize = 1)
-            ).records.firstOrNull()?.let { Duration.between(it.startTime, it.endTime).toMinutes() }
-        }
-        return Latest(rhr, weight, sleep)
+    private suspend fun <T : Record> records(
+        type: KClass<T>, fromMs: Long, toMs: Long, extract: (T) -> TimedValue?,
+    ): List<TimedValue> {
+        val out = ArrayList<TimedValue>()
+        var token: String? = null
+        do {
+            val res = client.readRecords(
+                ReadRecordsRequest(recordType = type, timeRangeFilter = range(fromMs, toMs), pageSize = 1000, pageToken = token)
+            )
+            for (r in res.records) extract(r)?.let { out.add(it) }
+            token = res.pageToken
+        } while (!token.isNullOrEmpty())
+        return out.sortedBy { it.time }
+    }
+
+    private suspend fun sleepNights(fromMs: Long, toMs: Long): List<SleepNight> {
+        val zone = ZoneId.systemDefault()
+        val parts = ArrayList<SleepNight>()
+        var token: String? = null
+        do {
+            val res = client.readRecords(
+                ReadRecordsRequest(recordType = SleepSessionRecord::class, timeRangeFilter = range(fromMs, toMs), pageSize = 200, pageToken = token)
+            )
+            for (r in res.records) {
+                var deep = 0L
+                var rem = 0L
+                var light = 0L
+                var awake = 0L
+                for (s in r.stages) {
+                    val m = Duration.between(s.startTime, s.endTime).toMinutes()
+                    when (s.stage) {
+                        SleepSessionRecord.STAGE_TYPE_DEEP -> deep += m
+                        SleepSessionRecord.STAGE_TYPE_REM -> rem += m
+                        SleepSessionRecord.STAGE_TYPE_LIGHT -> light += m
+                        1, 7 -> awake += m // awake, awake in bed
+                        else -> {}
+                    }
+                }
+                val total = Duration.between(r.startTime, r.endTime).toMinutes()
+                val asleep = if (deep + rem + light > 0) deep + rem + light else (total - awake).coerceAtLeast(0)
+                parts.add(SleepNight(r.endTime.toEpochMilli(), asleep, deep, rem, light, awake))
+            }
+            token = res.pageToken
+        } while (!token.isNullOrEmpty())
+        // One entry per wake-up day (a nap is added to that day)
+        return parts.groupBy { Instant.ofEpochMilli(it.endMs).atZone(zone).toLocalDate() }
+            .map { (_, l) ->
+                SleepNight(
+                    endMs = l.maxOf { it.endMs },
+                    totalMin = l.sumOf { it.totalMin },
+                    deepMin = l.sumOf { it.deepMin },
+                    remMin = l.sumOf { it.remMin },
+                    lightMin = l.sumOf { it.lightMin },
+                    awakeMin = l.sumOf { it.awakeMin },
+                )
+            }
+            .sortedBy { it.endMs }
+    }
+
+    /** Sleep (60 days), resting heart rate, weight, HRV, oxygen, VO2 max and daily heart rate. Each part fails alone. */
+    suspend fun metrics(): BodyMetrics {
+        val now = System.currentTimeMillis()
+        val day = 86_400_000L
+        val f60 = clampStart(now - 60 * day)
+        val f365 = clampStart(now - 365 * day)
+        val sleep = safe { sleepNights(f60, now) } ?: emptyList()
+        val rhr = safe { records(RestingHeartRateRecord::class, f365, now) { TimedValue(it.time.toEpochMilli(), it.beatsPerMinute.toDouble()) } } ?: emptyList()
+        val weight = safe { records(WeightRecord::class, f365, now) { TimedValue(it.time.toEpochMilli(), it.weight.inKilograms) } } ?: emptyList()
+        val hrv = safe { records(HeartRateVariabilityRmssdRecord::class, f60, now) { TimedValue(it.time.toEpochMilli(), it.heartRateVariabilityMillis) } } ?: emptyList()
+        val spo2 = safe { records(OxygenSaturationRecord::class, f60, now) { TimedValue(it.time.toEpochMilli(), it.percentage.value) } } ?: emptyList()
+        val vo2 = safe { records(Vo2MaxRecord::class, f365, now) { TimedValue(it.time.toEpochMilli(), it.vo2MillilitersPerMinuteKilogram) } } ?: emptyList()
+        val hrDays = safe {
+            val zone = ZoneId.systemDefault()
+            val from = LocalDateTime.ofInstant(Instant.ofEpochMilli(clampStart(now - 30 * day)), zone).toLocalDate().atStartOfDay()
+            val to = LocalDateTime.ofInstant(Instant.ofEpochMilli(now), zone).toLocalDate().plusDays(1).atStartOfDay()
+            client.aggregateGroupByPeriod(
+                AggregateGroupByPeriodRequest(
+                    metrics = setOf(HeartRateRecord.BPM_AVG, HeartRateRecord.BPM_MIN, HeartRateRecord.BPM_MAX),
+                    timeRangeFilter = TimeRangeFilter.between(from, to),
+                    timeRangeSlicer = Period.ofDays(1),
+                )
+            ).mapNotNull { g ->
+                val avg = g.result[HeartRateRecord.BPM_AVG] ?: return@mapNotNull null
+                HrDay(
+                    g.startTime.toLocalDate().toEpochDay(),
+                    avg.toInt(),
+                    (g.result[HeartRateRecord.BPM_MIN] ?: 0L).toInt(),
+                    (g.result[HeartRateRecord.BPM_MAX] ?: 0L).toInt(),
+                )
+            }
+        } ?: emptyList()
+        return BodyMetrics(sleep, rhr, weight, hrv, spo2, vo2, hrDays)
     }
 
     /** Last known height in cm, or 0. */

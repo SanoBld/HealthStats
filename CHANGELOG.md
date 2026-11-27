@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.3.0
+- One loading logo per page (spinning cookie with a progress ring and the percentage). Big in the page when it has nothing to show, small in the top bar otherwise.
+- Sync reports its real progress (workouts, daily totals, sleep/heart/body, workout stats).
+- Home redone with charts: steps (7 days), week, sleep (stages + 7 nights), heart (resting trend, today min/avg/max, HRV), body (weight, VO2 max, SpO2).
+- New compact top bar on every page (was too tall); all pages share the same layout.
+- Health Connect now also reads sleep stages, resting heart rate history, weight history, HRV, oxygen saturation, VO2 max and daily heart rate.
+- Settings: access check that lists every data type, allowed or not, and how much was found.
+
 ## 1.2.0
 - Workout detail: explained charts (tap the "i"): heart rate linked to the map, zones, distribution, effort score, intensity, heart drift, speed, elevation profile and climb, power, km splits.
 - New sport page (from Activities or Charts): trend per metric, totals, heart rate spread, records, recent sessions.
