@@ -1,0 +1,42 @@
+name: Build APK
+
+# Runs on every push / pull request, or by hand. Result: an APK in the run's "Artifacts".
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # Installs Gradle itself, so the repo does not need gradlew / the wrapper jar.
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Run unit tests
+        run: gradle testDebugUnitTest --no-daemon
+
+      - name: Build release APK
+        run: |
+          gradle assembleRelease --no-daemon \
+            -PappVersion="0.0.0-dev.${{ github.run_number }}" \
+            -PappBuild=${{ github.run_number }}
+
+      - name: Check APK exists
+        run: ls -la app/build/outputs/apk/release/ && test -f app/build/outputs/apk/release/app-release.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: HealthStats-apk
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error

@@ -1,14 +1,9 @@
-.gradle/
-build/
-local.properties
-.idea/
 *.iml
+.gradle/
+/local.properties
+/.idea/
 .DS_Store
-captures/
-.externalNativeBuild/
-.cxx/
-*.apk
-*.aab
-dist/
-# keep the shared signing key
-!app/debug.keystore
+build/
+/captures
+.externalNativeBuild
+.cxx

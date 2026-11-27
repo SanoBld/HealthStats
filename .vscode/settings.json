@@ -2,14 +2,6 @@
   "files.eol": "\n",
   "files.insertFinalNewline": true,
   "files.trimTrailingWhitespace": true,
-  "editor.formatOnSave": false,
-  "kotlin.languageServer.enabled": false,
-  "files.exclude": {
-    "**/.gradle": true,
-    "**/build": true
-  },
-  "search.exclude": {
-    "**/.gradle": true,
-    "**/build": true
-  }
+  "files.exclude": { "**/.gradle": true, "**/build": true },
+  "search.exclude": { "**/.gradle": true, "**/build": true }
 }

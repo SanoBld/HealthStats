@@ -1,11 +1,8 @@
 {
   "recommendations": [
+    "mathiasfrohlich.kotlin",
     "redhat.vscode-xml",
     "redhat.vscode-yaml",
-    "editorconfig.editorconfig",
     "github.vscode-github-actions"
-  ],
-  "unwantedRecommendations": [
-    "fwcd.kotlin"
   ]
 }

@@ -1,17 +1,12 @@
 package com.healthstats.app.data.model
 
-/** Health Connect values we can read as a list of (time, value). [permission] = end of the permission name. */
-enum class MetricType(val permission: String, val unit: String) {
-    RestingHr("READ_RESTING_HEART_RATE", "bpm"),
-    Hrv("READ_HEART_RATE_VARIABILITY", "ms"),
-    Spo2("READ_OXYGEN_SATURATION", "%"),
-    Vo2("READ_VO2_MAX", "ml/kg/min"),
-    Resp("READ_RESPIRATORY_RATE", "/min"),
-    BodyFat("READ_BODY_FAT", "%"),
-    Systolic("READ_BLOOD_PRESSURE", "mmHg"),
-    Temp("READ_BODY_TEMPERATURE", "°C"),
-    Weight("READ_WEIGHT", "kg"),
-}
+import androidx.annotation.StringRes
+import com.healthstats.app.R
 
-/** Curves recorded during a session. */
-enum class SampleKind { Speed, Power }
+/** What the charts screen can draw. */
+enum class ChartMetric(@StringRes val label: Int) {
+    Steps(R.string.charts_steps),
+    Kcal(R.string.charts_kcal),
+    Distance(R.string.charts_distance),
+    Workouts(R.string.charts_workouts),
+}

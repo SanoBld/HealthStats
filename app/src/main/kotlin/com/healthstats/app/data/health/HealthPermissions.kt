@@ -2,15 +2,29 @@ package com.healthstats.app.data.health
 
 import androidx.health.connect.client.PermissionController
 import androidx.health.connect.client.permission.HealthPermission
-import androidx.health.connect.client.records.*
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SleepSessionRecord
+import androidx.health.connect.client.records.StepsRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.WeightRecord
 
+/**
+ * Everything the app asks for. IMPORTANT: every permission here must also be in AndroidManifest.xml,
+ * otherwise Android silently refuses to show the request (= no data, endless loading).
+ * GPS routes are not in this list: Android asks for them one route at a time (see ExerciseRouteRequestContract).
+ */
 object HealthPermissions {
-    const val ROUTE = "android.permission.health.READ_EXERCISE_ROUTE"
     const val HISTORY = "android.permission.health.READ_HEALTH_DATA_HISTORY"
 
-    /** Everything the app reads (same list as the manifest). */
+    val EXERCISE: String = HealthPermission.getReadPermission(ExerciseSessionRecord::class)
+
     val ALL: Set<String> = setOf(
-        HealthPermission.getReadPermission(ExerciseSessionRecord::class),
+        EXERCISE,
         HealthPermission.getReadPermission(StepsRecord::class),
         HealthPermission.getReadPermission(HeartRateRecord::class),
         HealthPermission.getReadPermission(DistanceRecord::class),
@@ -19,30 +33,10 @@ object HealthPermissions {
         HealthPermission.getReadPermission(SleepSessionRecord::class),
         HealthPermission.getReadPermission(WeightRecord::class),
         HealthPermission.getReadPermission(HeightRecord::class),
-        HealthPermission.getReadPermission(SpeedRecord::class),
-        HealthPermission.getReadPermission(PowerRecord::class),
-        HealthPermission.getReadPermission(ElevationGainedRecord::class),
-        HealthPermission.getReadPermission(FloorsClimbedRecord::class),
         HealthPermission.getReadPermission(RestingHeartRateRecord::class),
-        HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class),
-        HealthPermission.getReadPermission(OxygenSaturationRecord::class),
-        HealthPermission.getReadPermission(Vo2MaxRecord::class),
-        HealthPermission.getReadPermission(RespiratoryRateRecord::class),
-        HealthPermission.getReadPermission(BodyFatRecord::class),
-        HealthPermission.getReadPermission(LeanBodyMassRecord::class),
-        HealthPermission.getReadPermission(BoneMassRecord::class),
-        HealthPermission.getReadPermission(BodyWaterMassRecord::class),
-        HealthPermission.getReadPermission(BasalMetabolicRateRecord::class),
-        HealthPermission.getReadPermission(BodyTemperatureRecord::class),
-        HealthPermission.getReadPermission(BloodPressureRecord::class),
-        HealthPermission.getReadPermission(BloodGlucoseRecord::class),
-        HealthPermission.getReadPermission(HydrationRecord::class),
-        HealthPermission.getReadPermission(NutritionRecord::class),
-        HealthPermission.getReadPermission(WheelchairPushesRecord::class),
-        ROUTE,
         HISTORY,
     )
 
     /** Use with rememberLauncherForActivityResult: input = permissions to ask, output = permissions granted. */
-    fun requestContract() = PermissionController.createRequestPermissionResultContract()
+    fun contract() = PermissionController.createRequestPermissionResultContract()
 }

@@ -1,12 +1,8 @@
 package com.healthstats.app.data.model
 
-import android.graphics.Bitmap
 import kotlinx.serialization.Serializable
 
 /** All times are epoch milliseconds. */
-
-@Serializable
-data class Segment(val type: Int, val start: Long, val end: Long, val reps: Int = 0)
 
 @Serializable
 data class Workout(
@@ -19,51 +15,51 @@ data class Workout(
     val end: Long,
     val hasRoute: Boolean = false,
     val distanceM: Double = 0.0,
-    val activeKcal: Double = 0.0,
-    val totalKcal: Double = 0.0,
+    val kcal: Double = 0.0,
     val steps: Int = 0,
-    val hrAvg: Double = 0.0,
-    val hrMax: Double = 0.0,
-    val hrMin: Double = 0.0,
-    val segments: List<Segment> = emptyList(),
+    val hrAvg: Int = 0,
+    val hrMax: Int = 0,
+    val hrMin: Int = 0,
+    val statsDone: Boolean = false,
+    // Filled only after duplicates are merged: the other copies of this activity
+    val alts: List<String> = emptyList(),
+    val altSources: List<String> = emptyList(),
 ) {
     val sport: SportInfo get() = sportOf(type)
-    val unknownType: Boolean get() = !Sports.containsKey(type)
     val durationSec: Long get() = (end - start) / 1000
-    val kcal: Double get() = if (activeKcal > 0) activeKcal else totalKcal
-    val paceMinKm: Double? get() = if (distanceM > 100 && durationSec > 0) durationSec / 60.0 / (distanceM / 1000) else null
-    val speedKmh: Double? get() = if (distanceM > 100 && durationSec > 0) (distanceM / 1000) / (durationSec / 3600.0) else null
-    val totalReps: Int get() = segments.sumOf { it.reps }
+    val paceMinKm: Double?
+        get() = if (distanceM > 100 && durationSec > 0) durationSec / 60.0 / (distanceM / 1000.0) else null
+    val speedKmh: Double?
+        get() = if (distanceM > 100 && durationSec > 0) (distanceM / 1000.0) / (durationSec / 3600.0) else null
 }
 
+/** Totals of one day. [epochDay] = LocalDate.toEpochDay(). */
 @Serializable
 data class DayStat(
-    val day: Long,
+    val epochDay: Long,
     val steps: Int = 0,
     val distanceM: Double = 0.0,
-    val activeKcal: Double = 0.0,
-    val totalKcal: Double = 0.0,
-    val hrAvg: Double = 0.0,
+    val kcal: Double = 0.0,
 )
 
-/** One GPS point. [alt] is NaN when unknown. */
-@Serializable
+/** One GPS point. [alt] is NaN when unknown, [time] is 0 when unknown. */
 data class RoutePoint(val lat: Double, val lng: Double, val alt: Double = Double.NaN, val time: Long = 0L)
 
 data class TimedValue(val time: Long, val value: Double)
 
-data class SleepStage(val type: Int, val start: Long, val end: Long) // type: 0 unknown, 1 awake, 2 light, 3 deep, 4 REM
-
-data class SleepSession(val start: Long, val end: Long, val title: String, val stages: List<SleepStage>)
-
-/** Name and icon of an app that wrote data. */
-data class AppInfo(val pkg: String, val label: String?, val icon: Bitmap?)
+/** Last known values shown on the home screen. */
+data class Latest(
+    val restingHr: Double? = null,
+    val weightKg: Double? = null,
+    val sleepMinutes: Long? = null,
+)
 
 enum class HcStatus { Available, UpdateRequired, Unavailable }
 
 sealed interface RouteResult {
     data class Data(val points: List<RoutePoint>) : RouteResult
-    /** The user must approve this route in a Health Connect dialog. */
-    data object ConsentRequired : RouteResult
+
+    /** Android wants the user's approval for this session's route. */
+    data class Consent(val sessionId: String) : RouteResult
     data object None : RouteResult
 }

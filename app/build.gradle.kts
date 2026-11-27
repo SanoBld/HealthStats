@@ -5,10 +5,9 @@ plugins {
     alias(libs.plugins.kotlin.serialization)
 }
 
-// Values given by CI: -PappVersion=1.2.3 -PappBuild=42 -PgithubRepo=user/repo
-val appVersion = providers.gradleProperty("appVersion").getOrElse("0.1.0")
+// Values given by CI: -PappVersion=1.2.3 -PappBuild=42
+val appVersion = providers.gradleProperty("appVersion").getOrElse("1.0.0")
 val appBuild = providers.gradleProperty("appBuild").map { it.toInt() }.getOrElse(1)
-val githubRepo = providers.gradleProperty("githubRepo").getOrElse("SanoBld/HealthStats")
 
 android {
     namespace = "com.healthstats.app"
@@ -16,17 +15,15 @@ android {
 
     defaultConfig {
         applicationId = "com.healthstats.app"
-        minSdk = 26 // Health Connect
+        minSdk = 26 // Health Connect needs Android 8+
         targetSdk = 35
         versionCode = appBuild
         versionName = appVersion
-        buildConfigField("String", "GITHUB_REPO", "\"$githubRepo\"")
         androidResources.localeFilters += listOf("en", "fr")
     }
 
-    // Same signature on every build, so updates install over the old app.
-    // app/debug.keystore is committed to the repo on purpose: CI runners are empty machines and
-    // would otherwise create a new random debug key at each run (= "app not installed" on update).
+    // Same key on every build, so a new APK installs over the old one.
+    // app/debug.keystore is committed on purpose (CI machines are empty).
     signingConfigs {
         create("shared") {
             storeFile = file("debug.keystore")
@@ -42,21 +39,8 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName("shared")
-            // R8 is off: a shrunk release build crashed at start. Turn it back on only with a logcat to test it.
             isMinifyEnabled = false
             isShrinkResources = false
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
-    }
-
-    // One APK per CPU + one universal APK
-    // Names: app-arm64-v8a-release.apk, app-universal-release.apk ... (the in-app updater needs these names)
-    splits {
-        abi {
-            isEnable = true
-            reset()
-            include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = true
         }
     }
 
@@ -64,7 +48,14 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions { jvmTarget = "17" }
+    kotlinOptions {
+        jvmTarget = "17"
+        freeCompilerArgs += listOf(
+            "-opt-in=androidx.compose.material3.ExperimentalMaterial3Api",
+            "-opt-in=androidx.compose.foundation.ExperimentalFoundationApi",
+            "-opt-in=androidx.compose.animation.ExperimentalAnimationApi",
+        )
+    }
 
     buildFeatures {
         compose = true

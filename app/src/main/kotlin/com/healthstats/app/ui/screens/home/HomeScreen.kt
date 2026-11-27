@@ -1,158 +1,250 @@
 package com.healthstats.app.ui.screens.home
 
-import androidx.activity.compose.BackHandler
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.AutoGraph
-import androidx.compose.material.icons.outlined.Dashboard
-import androidx.compose.material.icons.outlined.FitnessCenter
-import androidx.compose.material.icons.outlined.Map
-import androidx.compose.material.icons.outlined.Search
-import androidx.compose.material.icons.rounded.AutoGraph
-import androidx.compose.material.icons.rounded.Dashboard
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.FitnessCenter
-import androidx.compose.material.icons.rounded.Map
-import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.healthstats.app.R
 import com.healthstats.app.data.health.HealthState
-import com.healthstats.app.data.health.SyncError
-import com.healthstats.app.data.health.SyncStage
-import com.healthstats.app.ui.components.M3LoadingIndicator
-import com.healthstats.app.ui.components.WavyProgress
-import com.healthstats.app.ui.components.rememberHaptics
-import com.healthstats.app.viewmodel.AppViewModel
-import java.text.DateFormat
-import java.util.Date
-
-/** Bottom tabs. The home tab can never be hidden. */
-private enum class Tab(val key: String, val label: Int, val off: ImageVector, val on: ImageVector) {
-    Dash("dash", R.string.nav_dashboard, Icons.Outlined.Dashboard, Icons.Rounded.Dashboard),
-    Activities("activities", R.string.nav_activities, Icons.Outlined.FitnessCenter, Icons.Rounded.FitnessCenter),
-    Map("map", R.string.nav_map, Icons.Outlined.Map, Icons.Rounded.Map),
-    Search("search", R.string.nav_search, Icons.Outlined.Search, Icons.Rounded.Search),
-    Charts("charts", R.string.nav_charts, Icons.Outlined.AutoGraph, Icons.Rounded.AutoGraph),
-}
+import com.healthstats.app.data.local.AppSettings
+import com.healthstats.app.ui.components.EmptyState
+import com.healthstats.app.ui.components.ErrorCard
+import com.healthstats.app.ui.components.LoadingBlock
+import com.healthstats.app.ui.components.MetricTile
+import com.healthstats.app.ui.components.MorphLoader
+import com.healthstats.app.ui.components.SectionTitle
+import com.healthstats.app.ui.components.StepsRing
+import com.healthstats.app.ui.components.WaveLoader
+import com.healthstats.app.ui.components.WorkoutRow
+import com.healthstats.app.util.fmtDateTime
+import com.healthstats.app.util.fmtDistance
+import com.healthstats.app.util.fmtDuration
+import com.healthstats.app.util.fmtInt
+import com.healthstats.app.util.fmtKcal
+import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.format.TextStyle
+import java.util.Locale
 
 @Composable
-fun HomeScreen(vm: AppViewModel) {
-    val settings by vm.settings.collectAsStateWithLifecycle()
-    val health by vm.health.collectAsStateWithLifecycle()
-    val s = settings ?: return
-    val haptic = rememberHaptics(s.haptics)
+fun HomeScreen(
+    settings: AppSettings,
+    health: HealthState,
+    onSync: () -> Unit,
+    onConnect: () -> Unit,
+    onOpenWorkout: (String) -> Unit,
+    onOpenActivities: () -> Unit,
+) {
+    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val today = LocalDate.now()
+    val todayStat = health.days.lastOrNull { it.epochDay == today.toEpochDay() }
+    val zone = ZoneId.systemDefault()
+    val lRhr = stringResource(R.string.home_resting_hr)
+    val lWeight = stringResource(R.string.home_weight)
+    val lSleep = stringResource(R.string.home_sleep)
 
-    val tabs = Tab.entries.filter { it == Tab.Dash || it.key !in s.hiddenTabs }
-    var selectedKey by rememberSaveable { mutableStateOf(Tab.Dash.key) }
-    val current = tabs.firstOrNull { it.key == selectedKey } ?: tabs.first()
+    // Workouts of this week (Monday to Sunday)
+    val monday = today.with(DayOfWeek.MONDAY)
+    val weekDays = remember(health.workouts, monday) {
+        health.workouts
+            .map { Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate() }
+            .filter { !it.isBefore(monday) }
+            .toSet()
+    }
+    val weekCount = remember(health.workouts, monday) {
+        health.workouts.count { !Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().isBefore(monday) }
+    }
 
-    // Back button: go to the home tab first, then leave the app
-    BackHandler(enabled = current != tabs.first()) { selectedKey = tabs.first().key }
-    // Back from Health Connect settings etc.: re-check permissions, refresh if the data is old
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) { vm.onResume() }
+    LazyColumn(
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = top + 12.dp, bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        item {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        if (settings.name.isNotEmpty()) stringResource(R.string.home_hello, settings.name) else stringResource(R.string.home_hello_anon),
+                        style = MaterialTheme.typography.headlineMedium,
+                    )
+                    Text(
+                        if (health.lastSync > 0) stringResource(R.string.last_sync, fmtDateTime(health.lastSync)) else stringResource(R.string.never_synced),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (health.loading) {
+                    MorphLoader(size = 26.dp)
+                } else if (health.permitted) {
+                    IconButton(onClick = onSync) { Icon(Icons.Rounded.Refresh, stringResource(R.string.sync_now)) }
+                }
+            }
+        }
 
-    Scaffold(
-        containerColor = MaterialTheme.colorScheme.background,
-        bottomBar = {
-            NavigationBar {
-                for (t in tabs) {
-                    val sel = t == current
-                    NavigationBarItem(
-                        selected = sel,
-                        onClick = { if (!sel) { haptic(); selectedKey = t.key } },
-                        icon = { Icon(if (sel) t.on else t.off, contentDescription = null) },
-                        label = { Text(stringResource(t.label)) },
-                        alwaysShowLabel = s.navLabels,
+        if (health.ready && !health.permitted) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.home_no_perm_title), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Text(stringResource(R.string.home_no_perm_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
+                        Button(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
+                    }
+                }
+            }
+        }
+
+        health.error?.let { e ->
+            item {
+                ErrorCard(
+                    if (e.timeout) stringResource(R.string.err_timeout) else stringResource(R.string.err_other, e.detail),
+                    onRetry = onSync,
+                )
+            }
+        }
+
+        if (health.loading) {
+            item {
+                LoadingBlock(
+                    stringResource(if (health.loadingStage == 2) R.string.sync_daily else R.string.sync_reading),
+                    Modifier.padding(vertical = 12.dp),
+                )
+            }
+        } else if (health.enriching) {
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    WaveLoader()
+                    Text(
+                        stringResource(R.string.sync_stats, health.statsDone, health.statsTotal),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
             }
-        },
-    ) { pad ->
-        // Fade through: the old tab fades out fast, the new one fades in
-        AnimatedContent(
-            targetState = current,
-            transitionSpec = { fadeIn(tween(220, delayMillis = 90)) togetherWith fadeOut(tween(90)) },
-            label = "tabs",
-            modifier = Modifier.padding(pad),
-        ) { tab ->
-            // TEMPORARY: real tab screens come in the next steps
-            TabStatus(stringResource(tab.label), health) { vm.sync() }
         }
-    }
-}
 
-/** Temporary tab content: shows what the data layer loaded, so the sync can be checked on the phone. */
-@Composable
-private fun TabStatus(title: String, h: HealthState, onSync: () -> Unit) {
-    Column(
-        Modifier.fillMaxSize().statusBarsPadding().verticalScroll(rememberScrollState()).padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        Text(title, style = MaterialTheme.typography.headlineLarge)
-        Text(stringResource(R.string.status_activities, h.workouts.size), style = MaterialTheme.typography.titleMedium)
-        Text(stringResource(R.string.status_days, h.days.size), style = MaterialTheme.typography.titleMedium)
-        Text(
-            if (h.lastSync == 0L) stringResource(R.string.status_never)
-            else stringResource(R.string.status_last_sync, DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(h.lastSync))),
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (h.loading) {
-            val p = h.progress
-            Text(
-                when (p.stage) {
-                    SyncStage.ComputingStats -> stringResource(R.string.sync_stats, p.done, p.total)
-                    SyncStage.Totals -> stringResource(R.string.sync_totals)
-                    SyncStage.History -> stringResource(R.string.sync_history, p.year)
-                    else -> stringResource(R.string.sync_reading)
-                },
-            )
-            WavyProgress(progress = p.fraction, Modifier.fillMaxWidth())
+        if (health.permitted) {
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                        StepsRing(todayStat?.steps ?: 0, settings.stepGoal)
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Text(stringResource(R.string.home_steps_today), style = MaterialTheme.typography.titleMedium)
+                            Text(
+                                stringResource(R.string.home_goal, fmtInt(settings.stepGoal)),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (todayStat != null && todayStat.distanceM > 0) Text(fmtDistance(todayStat.distanceM), style = MaterialTheme.typography.bodyMedium)
+                            if (todayStat != null && todayStat.kcal > 0) Text(fmtKcal(todayStat.kcal), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            }
+
+            item {
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    shape = MaterialTheme.shapes.large,
+                ) {
+                    Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(stringResource(R.string.home_week), style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            stringResource(R.string.home_week_goal, weekCount, settings.weeklyGoal),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                            for (i in 0..6) {
+                                val d = monday.plusDays(i.toLong())
+                                val done = d in weekDays
+                                Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Box(
+                                        Modifier
+                                            .size(34.dp)
+                                            .clip(CircleShape)
+                                            .background(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest),
+                                        contentAlignment = Alignment.Center,
+                                    ) {
+                                        if (done) Icon(Icons.Rounded.FitnessCenter, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                                    }
+                                    Text(
+                                        d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (d == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            val tiles = buildList {
+                health.latest.restingHr?.let { add(lRhr to "${it.toInt()} bpm") }
+                health.latest.weightKg?.let { add(lWeight to String.format(Locale.getDefault(), "%.1f kg", it)) }
+                health.latest.sleepMinutes?.let { add(lSleep to fmtDuration(it * 60)) }
+            }
+            if (tiles.isNotEmpty()) {
+                item {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        tiles.forEach { (label, value) -> MetricTile(label, value, Modifier.weight(1f)) }
+                    }
+                }
+            }
+
+            val recent = health.workouts.take(3)
+            if (recent.isNotEmpty()) {
+                item {
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        SectionTitle(stringResource(R.string.home_recent), Modifier.weight(1f))
+                        TextButton(onClick = onOpenActivities) { Text(stringResource(R.string.home_see_all)) }
+                    }
+                }
+                items(recent, key = { it.id }) { w ->
+                    WorkoutRow(w, settings.sportColors, { onOpenWorkout(w.id) }, Modifier)
+                }
+            } else if (!health.loading && health.ready && health.error == null) {
+                item { EmptyState(Icons.Rounded.FitnessCenter, stringResource(R.string.home_no_data)) }
+            }
         }
-        h.error?.let { e ->
-            Text(
-                when (e.kind) {
-                    SyncError.Kind.Timeout -> stringResource(R.string.err_timeout)
-                    SyncError.Kind.PartialStats -> stringResource(R.string.err_stats, e.detail ?: "")
-                    SyncError.Kind.Other -> stringResource(R.string.err_other, e.detail ?: "")
-                },
-                color = MaterialTheme.colorScheme.error,
-            )
-        }
-        Button(onClick = onSync, enabled = !h.loading && h.permitted) { Text(stringResource(R.string.sync_now)) }
-        Spacer(Modifier.height(8.dp))
-        Text(stringResource(R.string.status_note), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Box(Modifier.fillMaxWidth().padding(top = 16.dp)) { if (h.loading) M3LoadingIndicator() }
     }
 }

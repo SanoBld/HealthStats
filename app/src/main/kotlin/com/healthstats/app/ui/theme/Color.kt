@@ -1,63 +1,55 @@
 package com.healthstats.app.ui.theme
 
-import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
 
-/**
- * Simple color scheme built from one accent color (used when Material You is off or not available).
- * Same hue everywhere: accents are colorful, surfaces are lightly tinted.
- */
-fun seedScheme(seed: Int, dark: Boolean): ColorScheme {
-    val hsv = FloatArray(3)
-    android.graphics.Color.colorToHSV(seed, hsv)
-    val h = hsv[0]
-    val gray = hsv[1] < 0.03f          // gray seed = pure gray theme
-    val sat = if (gray) 0f else hsv[1].coerceIn(0.35f, 0.9f)
-    fun c(hue: Float, s: Float, l: Float) = Color.hsl(hue, if (gray) 0f else s.coerceIn(0f, 1f), l)
-    val tint = 0.10f
-    return if (dark) darkColorScheme(
-        primary = c(h, sat, 0.78f), onPrimary = c(h, sat, 0.15f),
-        primaryContainer = c(h, sat, 0.28f), onPrimaryContainer = c(h, sat, 0.90f),
-        secondary = c(h, sat * 0.35f, 0.76f), onSecondary = c(h, sat * 0.35f, 0.18f),
-        secondaryContainer = c(h, sat * 0.35f, 0.27f), onSecondaryContainer = c(h, sat * 0.35f, 0.90f),
-        tertiary = c(h + 60f, 0.45f, 0.78f), onTertiary = c(h + 60f, 0.45f, 0.17f),
-        tertiaryContainer = c(h + 60f, 0.35f, 0.28f), onTertiaryContainer = c(h + 60f, 0.45f, 0.90f),
-        background = c(h, tint, 0.07f), onBackground = c(h, tint, 0.90f),
-        surface = c(h, tint, 0.07f), onSurface = c(h, tint, 0.90f),
-        surfaceVariant = c(h, tint, 0.25f), onSurfaceVariant = c(h, tint, 0.76f),
-        surfaceDim = c(h, tint, 0.06f), surfaceBright = c(h, tint, 0.24f),
-        surfaceContainerLowest = c(h, tint, 0.04f), surfaceContainerLow = c(h, tint, 0.10f),
-        surfaceContainer = c(h, tint, 0.12f), surfaceContainerHigh = c(h, tint, 0.16f),
-        surfaceContainerHighest = c(h, tint, 0.20f),
-        outline = c(h, tint, 0.55f), outlineVariant = c(h, tint, 0.30f),
-        error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
-    ) else lightColorScheme(
-        primary = c(h, sat, 0.42f), onPrimary = Color.White,
-        primaryContainer = c(h, sat, 0.88f), onPrimaryContainer = c(h, sat, 0.12f),
-        secondary = c(h, sat * 0.35f, 0.40f), onSecondary = Color.White,
-        secondaryContainer = c(h, sat * 0.35f, 0.88f), onSecondaryContainer = c(h, sat * 0.35f, 0.12f),
-        tertiary = c(h + 60f, 0.40f, 0.40f), onTertiary = Color.White,
-        tertiaryContainer = c(h + 60f, 0.45f, 0.88f), onTertiaryContainer = c(h + 60f, 0.45f, 0.12f),
-        background = c(h, tint, 0.98f), onBackground = c(h, tint, 0.10f),
-        surface = c(h, tint, 0.98f), onSurface = c(h, tint, 0.10f),
-        surfaceVariant = c(h, tint, 0.90f), onSurfaceVariant = c(h, tint, 0.30f),
-        surfaceDim = c(h, tint, 0.86f), surfaceBright = c(h, tint, 0.98f),
-        surfaceContainerLowest = Color.White, surfaceContainerLow = c(h, tint, 0.96f),
-        surfaceContainer = c(h, tint, 0.94f), surfaceContainerHigh = c(h, tint, 0.92f),
-        surfaceContainerHighest = c(h, tint, 0.90f),
-        outline = c(h, tint, 0.45f), outlineVariant = c(h, tint, 0.80f),
-        error = Color(0xFFBA1A1A), onError = Color.White,
-    )
-}
+val LightColors = lightColorScheme(
+    primary = Color(0xFFC00040),
+    onPrimary = Color(0xFFFFFFFF),
+    primaryContainer = Color(0xFFFFD9DD),
+    onPrimaryContainer = Color(0xFF40000F),
+    secondary = Color(0xFF75565B),
+    onSecondary = Color(0xFFFFFFFF),
+    secondaryContainer = Color(0xFFFFD9DD),
+    onSecondaryContainer = Color(0xFF2C1519),
+    tertiary = Color(0xFF775930),
+    background = Color(0xFFFFF8F7),
+    onBackground = Color(0xFF22191A),
+    surface = Color(0xFFFFF8F7),
+    onSurface = Color(0xFF22191A),
+    surfaceVariant = Color(0xFFF4DDDF),
+    onSurfaceVariant = Color(0xFF524345),
+    surfaceContainerLowest = Color(0xFFFFFFFF),
+    surfaceContainerLow = Color(0xFFFFF0F0),
+    surfaceContainer = Color(0xFFFCEAEA),
+    surfaceContainerHigh = Color(0xFFF7E4E4),
+    surfaceContainerHighest = Color(0xFFF1DEDF),
+    outline = Color(0xFF857375),
+    outlineVariant = Color(0xFFD7C1C3),
+)
 
-/** Accent colors offered in onboarding and settings. */
-val AccentChoices: List<Int> = listOf(
-    0xFFFF2020, 0xFFFF6D00, 0xFFFFB300, 0xFF2E9E5B, 0xFF00A6A6,
-    0xFF1E6CF0, 0xFF7C4DFF, 0xFFE91E8C, 0xFF607D8B,
-).map { it.toInt() }
-
-@Suppress("unused")
-private fun Color.argb() = toArgb()
+val DarkColors = darkColorScheme(
+    primary = Color(0xFFFFB2BC),
+    onPrimary = Color(0xFF670023),
+    primaryContainer = Color(0xFF920033),
+    onPrimaryContainer = Color(0xFFFFD9DD),
+    secondary = Color(0xFFE3BDC2),
+    onSecondary = Color(0xFF43292D),
+    secondaryContainer = Color(0xFF5B3F43),
+    onSecondaryContainer = Color(0xFFFFD9DD),
+    tertiary = Color(0xFFE9C08F),
+    background = Color(0xFF191112),
+    onBackground = Color(0xFFF0DEDF),
+    surface = Color(0xFF191112),
+    onSurface = Color(0xFFF0DEDF),
+    surfaceVariant = Color(0xFF524345),
+    onSurfaceVariant = Color(0xFFD7C1C3),
+    surfaceContainerLowest = Color(0xFF140C0D),
+    surfaceContainerLow = Color(0xFF22191A),
+    surfaceContainer = Color(0xFF261D1E),
+    surfaceContainerHigh = Color(0xFF312829),
+    surfaceContainerHighest = Color(0xFF3C3233),
+    outline = Color(0xFF9F8C8F),
+    outlineVariant = Color(0xFF524345),
+)

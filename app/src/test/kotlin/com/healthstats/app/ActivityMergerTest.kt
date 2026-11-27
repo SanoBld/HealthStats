@@ -7,28 +7,32 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ActivityMergerTest {
-    private val t0 = 1_700_000_000_000L
 
-    private fun w(id: String, src: String, start: Long, route: Boolean = false, dist: Double = 0.0) =
-        Workout(id = id, type = 56, source = src, start = start, end = start + 1_800_000, hasRoute = route, distanceM = dist)
+    private fun w(id: String, source: String, start: Long, route: Boolean = false, dist: Double = 0.0) =
+        Workout(id = id, type = 56, source = source, start = start, end = start + 1_800_000, hasRoute = route, distanceM = dist)
 
     @Test
-    fun mergesCopiesAndKeepsOriginalApp() {
-        val r = ActivityMerger.dedupe(
-            listOf(
-                w("a", "com.nothing.x", t0, dist = 5000.0),
-                w("b", "com.strava", t0 + 120_000, route = true, dist = 5100.0),
-            )
+    fun sameRunFromTwoAppsIsMerged() {
+        val list = listOf(
+            w("a", "com.nothing.nothingx", 1_000_000, dist = 5000.0),
+            w("b", "com.strava", 1_000_000 + 120_000, route = true),
         )
-        assertEquals(1, r.workouts.size)
-        assertEquals("a", r.workouts[0].id)        // original app wins
-        assertTrue(r.workouts[0].hasRoute)          // map comes from Strava
-        assertEquals(listOf("b"), r.alternates["a"])
+        val out = ActivityMerger.merge(list)
+        assertEquals(1, out.size)
+        assertEquals("a", out[0].id)          // original app wins
+        assertTrue(out[0].hasRoute)           // route taken from the other copy
+        assertEquals(listOf("b"), out[0].alts)
     }
 
     @Test
-    fun keepsFarApartActivities() {
-        val r = ActivityMerger.dedupe(listOf(w("a", "x", t0), w("b", "x", t0 + 3_600_000)))
-        assertEquals(2, r.workouts.size)
+    fun farApartWorkoutsStaySeparate() {
+        val list = listOf(w("a", "x", 0), w("b", "y", 3 * 3_600_000L))
+        assertEquals(2, ActivityMerger.merge(list).size)
+    }
+
+    @Test
+    fun sameSourceIsNeverMerged() {
+        val list = listOf(w("a", "x", 0), w("b", "x", 60_000))
+        assertEquals(2, ActivityMerger.merge(list).size)
     }
 }

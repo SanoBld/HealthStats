@@ -1,136 +1,56 @@
-name: Release HealthStats
+name: Release
 
-# Two ways to make a real release:
-#  1) Push a tag like v2.7.0 (or v2.7.0-beta for a pre-release)
-#  2) Run this workflow by hand from the Actions tab
+# Push a tag like v1.0.0 (or run by hand) to publish a GitHub Release with the APK.
 on:
   push:
     tags: [ 'v*.*.*' ]
   workflow_dispatch:
     inputs:
-      prerelease:
-        description: 'Mark as pre-release? (beta, rc...)'
-        type: boolean
-        required: false
-        default: false
       version:
-        description: 'Version to release (e.g. 2.0.1)'
+        description: 'Version (e.g. 1.0.1)'
         required: true
 
+permissions:
+  contents: write
+
 jobs:
-  # Works out tag / version / prerelease flag BEFORE the build,
-  # so the build job can receive them as an input.
-  resolve:
+  release:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      tag:        ${{ steps.meta.outputs.tag }}
-      version:    ${{ steps.meta.outputs.version }}
-      prerelease: ${{ steps.meta.outputs.prerelease }}
-      notes:      ${{ steps.changelog.outputs.notes }}
     steps:
       - uses: actions/checkout@v4
 
-      - name: Resolve tag, version and prerelease flag
-        id: meta
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Work out version
+        id: v
         env:
-          EVENT: ${{ github.event_name }}
           IN_VERSION: ${{ inputs.version }}
-          IN_PRE: ${{ inputs.prerelease }}
         run: |
-          if [ "$EVENT" = "workflow_dispatch" ]; then
-            VERSION="$IN_VERSION"
-            # Pre-release box ticked and no suffix yet: add "-beta"
-            if [ "$IN_PRE" = "true" ] && [[ "$VERSION" != *"-"* ]]; then
-              VERSION="${VERSION}-beta"
-            fi
-            TAG="v$VERSION"
+          if [ -n "$IN_VERSION" ]; then
+            echo "version=$IN_VERSION" >> "$GITHUB_OUTPUT"
+            echo "tag=v$IN_VERSION" >> "$GITHUB_OUTPUT"
           else
-            TAG="${GITHUB_REF_NAME}"
-            VERSION="${TAG#v}"
-          fi
-          echo "tag=$TAG"         >> "$GITHUB_OUTPUT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          if [[ "$VERSION" == *"-"* ]]; then
-            echo "prerelease=true"  >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            echo "version=${GITHUB_REF_NAME#v}" >> "$GITHUB_OUTPUT"
+            echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
           fi
 
-      # Takes only the section "## vX.Y.Z" from CHANGELOG.md
-      - name: Extract changelog entry for this version
-        id: changelog
-        env:
-          TAG: ${{ steps.meta.outputs.tag }}
+      - name: Build release APK
         run: |
-          NOTES=$(awk -v heading="## $TAG" '
-            $0 == heading { found=1; next }
-            found && /^## / { exit }
-            found { print }
-          ' CHANGELOG.md 2>/dev/null)
-          NOTES=$(printf '%s' "$NOTES" | sed -e '/./,$!d')
-          if [ -z "$NOTES" ]; then
-            NOTES="_(No changelog entry for $TAG)_"
-          fi
-          {
-            echo "notes<<CHANGELOG_EOF"
-            echo "$NOTES"
-            echo "CHANGELOG_EOF"
-          } >> "$GITHUB_OUTPUT"
+          gradle assembleRelease --no-daemon \
+            -PappVersion="${{ steps.v.outputs.version }}" \
+            -PappBuild=${{ github.run_number }}
+          cp app/build/outputs/apk/release/app-release.apk HealthStats-${{ steps.v.outputs.version }}.apk
 
-      - name: Create tag (manual run only)
-        if: github.event_name == 'workflow_dispatch'
-        env:
-          TAG: ${{ steps.meta.outputs.tag }}
-        run: |
-          git config user.name  "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag "$TAG" || true
-          git push origin "$TAG" || true
-
-  android:
-    needs: resolve
-    uses: ./.github/workflows/build-android.yml
-    with:
-      version: ${{ needs.resolve.outputs.version }}
-
-  publish-release:
-    needs: [ resolve, android ]
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Download build artifacts
-        uses: actions/download-artifact@v4
+      - uses: softprops/action-gh-release@v2
         with:
-          name: apks
-          path: flat-assets/
-
-      - name: List assets
-        run: ls -la flat-assets
-
-      - name: Create GitHub Release
-        uses: ncipollo/release-action@v1
-        with:
-          tag:                  ${{ needs.resolve.outputs.tag }}
-          name:                 "HealthStats v${{ needs.resolve.outputs.version }}"
-          artifacts:            "flat-assets/*"
-          generateReleaseNotes: true
-          prerelease:           ${{ needs.resolve.outputs.prerelease }}
-          makeLatest:           ${{ needs.resolve.outputs.prerelease == 'false' }}
-          token:                ${{ secrets.GITHUB_TOKEN }}
-          body: |
-            ## HealthStats v${{ needs.resolve.outputs.version }}
-
-            ${{ needs.resolve.outputs.notes }}
-
-            ### Android (même signature à chaque version : installez par-dessus, sans désinstaller)
-            | Fichier | Usage |
-            |---------|-------|
-            | `app-arm64-v8a-release.apk` | Téléphones récents (2018+) — **recommandé** |
-            | `app-armeabi-v7a-release.apk` | Anciens téléphones 32 bits |
-            | `app-x86_64-release.apk` | Émulateurs / tablettes x86 |
-            | `app-universal-release.apk` | Fonctionne partout (le plus gros) |
+          tag_name: ${{ steps.v.outputs.tag }}
+          generate_release_notes: true
+          prerelease: ${{ contains(steps.v.outputs.version, '-') }}
+          files: HealthStats-${{ steps.v.outputs.version }}.apk
