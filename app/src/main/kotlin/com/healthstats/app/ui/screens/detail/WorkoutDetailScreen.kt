@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -63,6 +64,7 @@ import com.healthstats.app.util.fmtSpeed
 import com.healthstats.app.util.fmtTime
 import com.healthstats.app.util.pointAt
 import com.healthstats.app.util.routeFractions
+import com.healthstats.app.util.splitsOf
 import com.healthstats.app.viewmodel.WorkoutViewModel
 
 private val ZoneColors = listOf(Color(0xFF8E8E93), Color(0xFF34C759), Color(0xFFFFCC00), Color(0xFFFF9500), Color(0xFFFF3B30))
@@ -89,6 +91,8 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
     val workout: Workout? = w
     val lineColor = (if (settings.sportColors) workout?.sport?.color else null) ?: MaterialTheme.colorScheme.primary
 
+    val splits = remember(d.route) { splitsOf(d.route) }
+
     LazyColumn(
         contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = top + 8.dp, bottom = bottom + 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
@@ -101,7 +105,7 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
 
         item {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                SportBadge(sport, settings.sportColors, size = 64.dp)
+                SportBadge(sport, settings.sportColors, size = 76.dp, spin = true)
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(workout.title.ifEmpty { sport.name }, style = MaterialTheme.typography.headlineSmall)
                     Text(
@@ -169,7 +173,7 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
                 Card(
                     Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    shape = MaterialTheme.shapes.large,
+                    shape = MaterialTheme.shapes.extraLarge,
                 ) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.detail_route_allow_sub), style = MaterialTheme.typography.bodyMedium)
@@ -215,7 +219,7 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
                 Card(
                     Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    shape = MaterialTheme.shapes.large,
+                    shape = MaterialTheme.shapes.extraLarge,
                 ) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(stringResource(R.string.detail_zones) + " (max ${d.maxHr})", style = MaterialTheme.typography.titleMedium)
@@ -239,6 +243,40 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
             }
         }
 
+        if (splits.size >= 1 && workout.type in setOf(56, 57, 79, 37, 8, 9)) {
+            item {
+                val best = splits.minOf { it.secPerKm }
+                val bike = workout.type == 8 || workout.type == 9
+                Card(
+                    Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                    shape = MaterialTheme.shapes.extraLarge,
+                ) {
+                    Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(stringResource(R.string.detail_splits), style = MaterialTheme.typography.titleMedium)
+                        splits.forEach { s ->
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                Text(
+                                    if (s.meters >= 999) "${s.km}" else String.format(java.util.Locale.getDefault(), "%.1f", s.km - 1 + s.meters / 1000.0),
+                                    Modifier.width(32.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                                Box(Modifier.weight(1f).height(14.dp).clip(RoundedCornerShape(7.dp)).background(MaterialTheme.colorScheme.surfaceContainerHighest)) {
+                                    Box(Modifier.fillMaxWidth((best / s.secPerKm).toFloat().coerceIn(0.05f, 1f)).height(14.dp).clip(RoundedCornerShape(7.dp)).background(lineColor))
+                                }
+                                Text(
+                                    if (bike) fmtSpeed(3600.0 / s.secPerKm) else fmtPace(s.secPerKm / 60.0),
+                                    Modifier.width(84.dp),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         if (workout.notes.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -255,7 +293,7 @@ private fun ChartCard(title: String, value: String?, chart: @Composable () -> Un
     Card(
         Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = MaterialTheme.shapes.large,
+        shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {

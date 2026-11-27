@@ -3,21 +3,17 @@ package com.healthstats.app.ui.screens.activities
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -34,21 +30,29 @@ import androidx.compose.ui.unit.dp
 import com.healthstats.app.R
 import com.healthstats.app.data.health.HealthState
 import com.healthstats.app.data.local.AppSettings
+import com.healthstats.app.data.model.SportInfo
 import com.healthstats.app.data.model.sourceLabel
 import com.healthstats.app.data.model.sportOf
 import com.healthstats.app.ui.components.EmptyState
+import com.healthstats.app.ui.components.LargeScreen
 import com.healthstats.app.ui.components.LoadingBlock
+import com.healthstats.app.ui.components.SportSummaryCard
 import com.healthstats.app.ui.components.WorkoutRow
+import com.healthstats.app.ui.components.appear
+import com.healthstats.app.ui.theme.groupedShape
 import com.healthstats.app.util.fmtMonth
+
+private class TypeStat(val type: Int, val count: Int, val sec: Long)
 
 @Composable
 fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: (String) -> Unit) {
-    val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var query by rememberSaveable { mutableStateOf("") }
     var sportFilter by rememberSaveable { mutableStateOf(-1) } // -1 = all
 
-    val types = remember(health.workouts) {
-        health.workouts.groupingBy { it.type }.eachCount().entries.sortedByDescending { it.value }.map { it.key }
+    val stats = remember(health.workouts) {
+        health.workouts.groupBy { it.type }
+            .map { (t, l) -> TypeStat(t, l.size, l.sumOf { it.durationSec }) }
+            .sortedByDescending { it.count }
     }
     val filtered = remember(health.workouts, query, sportFilter) {
         val q = query.trim().lowercase()
@@ -59,63 +63,75 @@ fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: 
         }
     }
     val grouped = remember(filtered) { filtered.groupBy { fmtMonth(it.start) } }
+    val allSport = remember { SportInfo("Tout", "All", Icons.Rounded.FitnessCenter, androidx.compose.ui.graphics.Color(0xFF8E8E93)) }
 
-    LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = top + 12.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        item {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.act_title), style = MaterialTheme.typography.headlineMedium)
-                Text(
-                    stringResource(R.string.act_count, filtered.size),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+    LargeScreen(stringResource(R.string.act_title)) { inner ->
+        LazyColumn(
+            Modifier.padding(inner),
+            contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            item {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    placeholder = { Text(stringResource(R.string.act_search)) },
+                    leadingIcon = { Icon(Icons.Rounded.Search, null) },
+                    singleLine = true,
+                    shape = MaterialTheme.shapes.extraLarge,
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 )
             }
-        }
-        item {
-            OutlinedTextField(
-                value = query,
-                onValueChange = { query = it },
-                placeholder = { Text(stringResource(R.string.act_search)) },
-                leadingIcon = { Icon(Icons.Rounded.Search, null) },
-                singleLine = true,
-                shape = MaterialTheme.shapes.extraLarge,
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (types.size > 1) {
-            item {
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    item {
-                        FilterChip(selected = sportFilter == -1, onClick = { sportFilter = -1 }, label = { Text(stringResource(R.string.act_all)) })
+            if (stats.size > 1) {
+                item {
+                    LazyRow(
+                        Modifier.padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    ) {
+                        item {
+                            SportSummaryCard(
+                                allSport.let { SportInfo(stringResource(R.string.act_all), stringResource(R.string.act_all), it.icon, it.color) },
+                                colored = false,
+                                count = health.workouts.size,
+                                totalSec = health.workouts.sumOf { it.durationSec },
+                                selected = sportFilter == -1,
+                                onClick = { sportFilter = -1 },
+                                modifier = Modifier.width(150.dp),
+                            )
+                        }
+                        items(stats, key = { it.type }) { s ->
+                            SportSummaryCard(
+                                sportOf(s.type), settings.sportColors, s.count, s.sec,
+                                selected = sportFilter == s.type,
+                                onClick = { sportFilter = if (sportFilter == s.type) -1 else s.type },
+                                modifier = Modifier.width(150.dp),
+                            )
+                        }
                     }
-                    items(types, key = { it }) { t ->
-                        val sp = sportOf(t)
-                        FilterChip(
-                            selected = sportFilter == t,
-                            onClick = { sportFilter = if (sportFilter == t) -1 else t },
-                            label = { Text(sp.name) },
-                            leadingIcon = { Icon(sp.icon, null, Modifier.size(18.dp)) },
+                }
+            }
+            if (health.loading && health.workouts.isEmpty()) {
+                item { LoadingBlock(stringResource(R.string.sync_reading), Modifier.padding(vertical = 32.dp)) }
+            } else if (filtered.isEmpty()) {
+                item { EmptyState(Icons.Rounded.FitnessCenter, stringResource(R.string.act_empty)) }
+            }
+            grouped.forEach { (month, list) ->
+                stickyHeader(key = "h_$month") {
+                    Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(top = 12.dp, bottom = 8.dp)) {
+                        Text(
+                            month + " · " + stringResource(R.string.act_count, list.size),
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.primary,
                         )
                     }
                 }
-            }
-        }
-        if (health.loading && health.workouts.isEmpty()) {
-            item { LoadingBlock(stringResource(R.string.sync_reading), Modifier.padding(vertical = 32.dp)) }
-        } else if (filtered.isEmpty()) {
-            item { EmptyState(Icons.Rounded.FitnessCenter, stringResource(R.string.act_empty)) }
-        }
-        grouped.forEach { (month, list) ->
-            stickyHeader(key = "h_$month") {
-                Box(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.background).padding(vertical = 8.dp)) {
-                    Text(month, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.primary)
+                itemsIndexed(list, key = { _, w -> w.id }) { i, w ->
+                    WorkoutRow(
+                        w, settings.sportColors, { onOpenWorkout(w.id) },
+                        Modifier.animateItem(),
+                        shape = groupedShape(i, list.size),
+                    )
                 }
-            }
-            items(list, key = { it.id }) { w ->
-                WorkoutRow(w, settings.sportColors, { onOpenWorkout(w.id) }, Modifier.animateItem())
             }
         }
     }

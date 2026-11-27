@@ -73,3 +73,43 @@ fun routeFractions(points: List<RoutePoint>, startMs: Long, endMs: Long): List<F
     return if (hasTimes(points)) points.map { ((it.time - startMs) / span).coerceIn(0f, 1f) }
     else points.indices.map { it.toFloat() / (points.size - 1).coerceAtLeast(1) }
 }
+
+/** One kilometer (or the last part of it) of a route. */
+class Split(val km: Int, val seconds: Long, val meters: Double) {
+    val secPerKm: Double get() = seconds / (meters / 1000.0)
+}
+
+private fun distanceM(a: RoutePoint, b: RoutePoint): Double {
+    val r = 6371000.0
+    val dLat = Math.toRadians(b.lat - a.lat)
+    val dLng = Math.toRadians(b.lng - a.lng)
+    val h = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(Math.toRadians(a.lat)) * Math.cos(Math.toRadians(b.lat)) * Math.sin(dLng / 2) * Math.sin(dLng / 2)
+    return 2 * r * Math.asin(Math.sqrt(h))
+}
+
+/** Splits per kilometer from a route with times. Empty if the route has no times. */
+fun splitsOf(points: List<RoutePoint>): List<Split> {
+    if (points.size < 2 || points.first().time <= 0L || points.last().time <= points.first().time) return emptyList()
+    val out = ArrayList<Split>()
+    var cum = 0.0
+    var nextKm = 1
+    var lastKmTime = points.first().time
+    for (i in 1 until points.size) {
+        val a = points[i - 1]
+        val b = points[i]
+        val d = distanceM(a, b)
+        val before = cum
+        cum += d
+        while (cum >= nextKm * 1000.0) {
+            val frac = if (d > 0) (nextKm * 1000.0 - before) / d else 1.0
+            val t = a.time + ((b.time - a.time) * frac).toLong()
+            out.add(Split(nextKm, ((t - lastKmTime) / 1000).coerceAtLeast(1L), 1000.0))
+            lastKmTime = t
+            nextKm++
+        }
+    }
+    val rest = cum - (nextKm - 1) * 1000.0
+    if (rest >= 150) out.add(Split(nextKm, ((points.last().time - lastKmTime) / 1000).coerceAtLeast(1L), rest))
+    return out
+}

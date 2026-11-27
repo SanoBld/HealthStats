@@ -4,6 +4,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
@@ -123,10 +125,28 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
             navController = nav,
             startDestination = start,
             modifier = Modifier.padding(bottom = inner.calculateBottomPadding()),
-            enterTransition = { fadeIn(tween(NavMillis)) + slideInHorizontally(tween(NavMillis)) { it / 12 } },
-            exitTransition = { fadeOut(tween(NavMillis / 2)) },
-            popEnterTransition = { fadeIn(tween(NavMillis)) },
-            popExitTransition = { fadeOut(tween(NavMillis / 2)) + slideOutHorizontally(tween(NavMillis)) { it / 12 } },
+            enterTransition = {
+                if (targetState.destination.route == Routes.Detail) {
+                    slideInHorizontally(tween(NavMillis)) { it / 5 } + fadeIn(tween(NavMillis)) + scaleIn(tween(NavMillis), 0.94f)
+                } else {
+                    fadeIn(tween(NavMillis, delayMillis = 60)) + scaleIn(tween(NavMillis, delayMillis = 60), 0.92f)
+                }
+            },
+            exitTransition = {
+                if (targetState.destination.route == Routes.Detail) {
+                    fadeOut(tween(NavMillis / 2)) + scaleOut(tween(NavMillis), 0.96f)
+                } else {
+                    fadeOut(tween(NavMillis / 2))
+                }
+            },
+            popEnterTransition = { fadeIn(tween(NavMillis)) + scaleIn(tween(NavMillis), 0.96f) },
+            popExitTransition = {
+                if (initialState.destination.route == Routes.Detail) {
+                    slideOutHorizontally(tween(NavMillis)) { it / 5 } + fadeOut(tween(NavMillis / 2)) + scaleOut(tween(NavMillis), 0.94f)
+                } else {
+                    fadeOut(tween(NavMillis / 2))
+                }
+            },
         ) {
             composable(Routes.Onboarding) {
                 OnboardingScreen(
@@ -157,7 +177,7 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
             composable(Routes.Activities) {
                 ActivitiesScreen(settings, health) { nav.navigate(Routes.detail(it)) }
             }
-            composable(Routes.Charts) { ChartsScreen(health) }
+            composable(Routes.Charts) { ChartsScreen(health, settings.sportColors) { nav.navigate(Routes.detail(it)) } }
             composable(Routes.Settings) { SettingsScreen(settings, health, vm, connect) }
             composable(
                 Routes.Detail,

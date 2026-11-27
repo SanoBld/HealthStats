@@ -1,5 +1,12 @@
 package com.healthstats.app.ui.components
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
+import com.healthstats.app.ui.theme.CookieShape
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -68,15 +75,19 @@ fun StatTile(label: String, value: String, modifier: Modifier = Modifier) {
     }
 }
 
-/** Round icon of a sport. Colored by sport, or in the theme color when [colored] is false. */
+/** Round "cookie" icon of a sport. Colored by sport, or in the theme color when [colored] is false. */
 @Composable
-fun SportBadge(sport: SportInfo, colored: Boolean, size: Dp = 48.dp, modifier: Modifier = Modifier) {
+fun SportBadge(sport: SportInfo, colored: Boolean, size: Dp = 48.dp, modifier: Modifier = Modifier, spin: Boolean = false) {
     val fg = if (colored) sport.color else MaterialTheme.colorScheme.onPrimaryContainer
-    val bg = if (colored) sport.color.copy(alpha = 0.18f) else MaterialTheme.colorScheme.primaryContainer
-    Box(
-        modifier.size(size).clip(CircleShape).background(bg),
-        contentAlignment = Alignment.Center,
-    ) {
+    val bg = if (colored) sport.color.copy(alpha = 0.2f) else MaterialTheme.colorScheme.primaryContainer
+    val shape = remember(sport) { CookieShape(lobes = 6 + sport.fr.length % 5) }
+    val rot = if (spin) {
+        val t = rememberInfiniteTransition(label = "badge")
+        val r by t.animateFloat(0f, 360f, infiniteRepeatable(tween(24000, easing = LinearEasing)), label = "rot")
+        r
+    } else 0f
+    Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        Box(Modifier.matchParentSize().graphicsLayer { rotationZ = rot }.clip(shape).background(bg))
         Icon(sport.icon, contentDescription = null, tint = fg, modifier = Modifier.size(size * 0.5f))
     }
 }

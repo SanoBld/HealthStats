@@ -1,6 +1,23 @@
 package com.healthstats.app.ui.screens.charts
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import com.healthstats.app.data.model.sportOf
+import com.healthstats.app.ui.components.LargeScreen
+import com.healthstats.app.ui.components.SportBadge
+import com.healthstats.app.ui.components.springClick
+import com.healthstats.app.ui.theme.groupedShape
+import com.healthstats.app.util.fmtDate
+import com.healthstats.app.util.fmtDistance
+import com.healthstats.app.util.fmtDuration
+import com.healthstats.app.util.fmtKcal
+import com.healthstats.app.util.fmtPace
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
@@ -102,7 +119,7 @@ private fun format(metric: ChartMetric, v: Float): String = when (metric) {
 }
 
 @Composable
-fun ChartsScreen(health: HealthState) {
+fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) -> Unit) {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var metricIdx by rememberSaveable { mutableIntStateOf(0) }
     var period by rememberSaveable { mutableIntStateOf(30) } // 0 = all
@@ -123,11 +140,11 @@ fun ChartsScreen(health: HealthState) {
     val avg = if (metric == ChartMetric.Workouts) total / (series.windowDays / 7f).coerceAtLeast(1f) else total / series.windowDays
     val periods = listOf(7 to R.string.charts_7d, 30 to R.string.charts_30d, 90 to R.string.charts_90d, 365 to R.string.charts_1y, 0 to R.string.act_all)
 
+    LargeScreen(stringResource(R.string.charts_title)) { inner ->
     Column(
-        Modifier.verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = top + 12.dp, bottom = 24.dp),
+        Modifier.padding(inner).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Text(stringResource(R.string.charts_title), style = MaterialTheme.typography.headlineMedium)
         LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             items(ChartMetric.entries.toList()) { m ->
                 FilterChip(selected = m == metric, onClick = { metricIdx = m.ordinal }, label = { Text(stringResource(m.label)) })
@@ -161,6 +178,93 @@ fun ChartsScreen(health: HealthState) {
                 StatTile(stringResource(R.string.charts_total), format(metric, total), Modifier.weight(1f))
                 StatTile(stringResource(R.string.charts_avg), format(metric, avg), Modifier.weight(1f))
                 StatTile(stringResource(R.string.charts_best), format(metric, best), Modifier.weight(1f))
+            }
+        }
+
+        val inPeriod = remember(health.workouts, period) {
+            if (period == 0) health.workouts else {
+                val from = LocalDate.now().minusDays(period - 1L).atStartOfDay(ZoneId.systemDefault()).toInstant().toEpochMilli()
+                health.workouts.filter { it.start >= from }
+            }
+        }
+        if (inPeriod.isNotEmpty()) {
+            SportBreakdown(inPeriod, colored)
+            Records(inPeriod, colored, onOpenWorkout)
+        }
+    }
+    }
+}
+
+@Composable
+private fun SportBreakdown(workouts: List<Workout>, colored: Boolean) {
+    val groups = remember(workouts) {
+        workouts.groupBy { it.type }.map { (t, l) -> Triple(t, l.size, l.sumOf { it.durationSec }) }.sortedByDescending { it.third }
+    }
+    val total = groups.sumOf { it.third }.coerceAtLeast(1L)
+    Card(
+        Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        shape = MaterialTheme.shapes.extraLarge,
+    ) {
+        Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(stringResource(R.string.charts_by_sport), style = MaterialTheme.typography.titleMedium)
+            Row(Modifier.fillMaxWidth().height(16.dp).clip(RoundedCornerShape(8.dp)), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                groups.forEachIndexed { i, g ->
+                    val c = if (colored) sportOf(g.first).color else MaterialTheme.colorScheme.primary.copy(alpha = (1f - i * 0.15f).coerceAtLeast(0.25f))
+                    Box(Modifier.weight(g.third.coerceAtLeast(1L).toFloat()).fillMaxHeight().background(c))
+                }
+            }
+            groups.forEach { (type, count, sec) ->
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SportBadge(sportOf(type), colored, size = 40.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text(sportOf(type).name, style = MaterialTheme.typography.titleSmall)
+                        Text(stringResource(R.string.act_count, count) + " · " + fmtDuration(sec), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text("${(sec * 100 / total)} %", style = MaterialTheme.typography.titleSmall)
+                }
+            }
+        }
+    }
+}
+
+private class Record(val label: String, val value: String, val w: Workout)
+
+@Composable
+private fun Records(workouts: List<Workout>, colored: Boolean, onOpen: (String) -> Unit) {
+    val lDist = stringResource(R.string.rec_distance)
+    val lDur = stringResource(R.string.rec_duration)
+    val lPace = stringResource(R.string.rec_pace)
+    val lKcal = stringResource(R.string.rec_kcal)
+    val lHr = stringResource(R.string.rec_hr)
+    val items = remember(workouts, lDist) {
+        buildList {
+            workouts.filter { it.distanceM > 0 }.maxByOrNull { it.distanceM }?.let { add(Record(lDist, fmtDistance(it.distanceM), it)) }
+            workouts.maxByOrNull { it.durationSec }?.let { add(Record(lDur, fmtDuration(it.durationSec), it)) }
+            workouts.filter { it.type in setOf(56, 57, 79, 37) && it.distanceM >= 1000 }
+                .minByOrNull { it.paceMinKm ?: Double.MAX_VALUE }?.let { w -> w.paceMinKm?.let { add(Record(lPace, fmtPace(it), w)) } }
+            workouts.filter { it.kcal > 0 }.maxByOrNull { it.kcal }?.let { add(Record(lKcal, fmtKcal(it.kcal), it)) }
+            workouts.filter { it.hrMax > 0 }.maxByOrNull { it.hrMax }?.let { add(Record(lHr, "${it.hrMax} bpm", it)) }
+        }
+    }
+    if (items.isEmpty()) return
+    Text(stringResource(R.string.charts_records), style = MaterialTheme.typography.titleMedium)
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        items.forEachIndexed { i, r ->
+            val shape = groupedShape(i, items.size)
+            Card(
+                Modifier.fillMaxWidth().springClick(shape) { onOpen(r.w.id) },
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+                shape = shape,
+            ) {
+                Row(Modifier.padding(14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    SportBadge(r.w.sport, colored, size = 44.dp)
+                    Column(Modifier.weight(1f)) {
+                        Text(r.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        Text(r.value, style = MaterialTheme.typography.titleMedium)
+                    }
+                    Text(fmtDate(r.w.start), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }

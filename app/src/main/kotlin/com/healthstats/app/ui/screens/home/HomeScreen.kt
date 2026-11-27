@@ -37,6 +37,8 @@ import com.healthstats.app.R
 import com.healthstats.app.data.health.HealthState
 import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.ui.components.EmptyState
+import com.healthstats.app.ui.components.LargeScreen
+import com.healthstats.app.ui.components.appear
 import com.healthstats.app.ui.components.ErrorCard
 import com.healthstats.app.ui.components.LoadingBlock
 import com.healthstats.app.ui.components.MetricTile
@@ -86,29 +88,45 @@ fun HomeScreen(
         health.workouts.count { !Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().isBefore(monday) }
     }
 
+    val title = if (settings.name.isNotEmpty()) stringResource(R.string.home_hello, settings.name) else stringResource(R.string.home_hello_anon)
+    val weekWorkouts = remember(health.workouts, monday) {
+        health.workouts.filter { !Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().isBefore(monday) }
+    }
+    val streak = remember(health.workouts) {
+        val days = health.workouts.map { Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate() }.toSet()
+        var d = if (today in days) today else today.minusDays(1)
+        var n = 0
+        while (d in days) { n++; d = d.minusDays(1) }
+        n
+    }
+    val lWeekTotals = stringResource(R.string.home_week_totals)
+    val lDist = stringResource(R.string.detail_distance)
+    val lDur = stringResource(R.string.detail_duration)
+    val lKcal = stringResource(R.string.detail_kcal)
+    var idx = 0
+
+    LargeScreen(
+        title,
+        actions = {
+            if (health.loading) {
+                MorphLoader(size = 26.dp)
+                androidx.compose.foundation.layout.Spacer(Modifier.size(16.dp))
+            } else if (health.permitted) {
+                IconButton(onClick = onSync) { Icon(Icons.Rounded.Refresh, stringResource(R.string.sync_now)) }
+            }
+        },
+    ) { inner ->
     LazyColumn(
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = top + 12.dp, bottom = 24.dp),
+        Modifier.padding(inner),
+        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        if (settings.name.isNotEmpty()) stringResource(R.string.home_hello, settings.name) else stringResource(R.string.home_hello_anon),
-                        style = MaterialTheme.typography.headlineMedium,
-                    )
-                    Text(
-                        if (health.lastSync > 0) stringResource(R.string.last_sync, fmtDateTime(health.lastSync)) else stringResource(R.string.never_synced),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                if (health.loading) {
-                    MorphLoader(size = 26.dp)
-                } else if (health.permitted) {
-                    IconButton(onClick = onSync) { Icon(Icons.Rounded.Refresh, stringResource(R.string.sync_now)) }
-                }
-            }
+            Text(
+                if (health.lastSync > 0) stringResource(R.string.last_sync, fmtDateTime(health.lastSync)) else stringResource(R.string.never_synced),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (health.ready && !health.permitted) {
@@ -159,11 +177,11 @@ fun HomeScreen(
         if (health.permitted) {
             item {
                 Card(
-                    Modifier.fillMaxWidth(),
+                    Modifier.fillMaxWidth().appear(0),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-                    shape = MaterialTheme.shapes.large,
+                    shape = MaterialTheme.shapes.extraLarge,
                 ) {
-                    Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
+                    Row(Modifier.padding(24.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                         StepsRing(todayStat?.steps ?: 0, settings.stepGoal)
                         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Text(stringResource(R.string.home_steps_today), style = MaterialTheme.typography.titleMedium)
@@ -218,6 +236,19 @@ fun HomeScreen(
                 }
             }
 
+            item {
+                Row(Modifier.fillMaxWidth().appear(2), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (streak >= 2) {
+                        MetricTile(stringResource(R.string.home_streak, streak), "\uD83D\uDD25 $streak", Modifier.weight(1f))
+                    }
+                    MetricTile(lDur, fmtDuration(weekWorkouts.sumOf { it.durationSec }), Modifier.weight(1f))
+                    val dist = weekWorkouts.sumOf { it.distanceM }
+                    if (dist > 0) MetricTile(lDist, fmtDistance(dist), Modifier.weight(1f))
+                    val kc = weekWorkouts.sumOf { it.kcal }
+                    if (dist <= 0 && kc > 0) MetricTile(lKcal, fmtKcal(kc), Modifier.weight(1f))
+                }
+            }
+
             val tiles = buildList {
                 health.latest.restingHr?.let { add(lRhr to "${it.toInt()} bpm") }
                 health.latest.weightKg?.let { add(lWeight to String.format(Locale.getDefault(), "%.1f kg", it)) }
@@ -246,5 +277,6 @@ fun HomeScreen(
                 item { EmptyState(Icons.Rounded.FitnessCenter, stringResource(R.string.home_no_data)) }
             }
         }
+    }
     }
 }

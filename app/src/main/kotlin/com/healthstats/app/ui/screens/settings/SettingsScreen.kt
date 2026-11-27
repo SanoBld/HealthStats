@@ -46,6 +46,7 @@ import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.data.local.SettingsStore.Keys
 import com.healthstats.app.data.local.ThemeMode
 import com.healthstats.app.ui.components.DateField
+import com.healthstats.app.ui.components.LargeScreen
 import com.healthstats.app.ui.components.MorphLoader
 import com.healthstats.app.util.fmtInt
 import com.healthstats.app.util.openHealthConnect
@@ -61,9 +62,9 @@ private fun Section(title: String, content: @Composable () -> Unit) {
         Card(
             Modifier.fillMaxWidth(),
             colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-            shape = MaterialTheme.shapes.large,
+            shape = MaterialTheme.shapes.extraLarge,
         ) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
+            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) { content() }
         }
     }
 }
@@ -92,12 +93,11 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
     var confirmClear by remember { mutableStateOf(false) }
     val clearedMsg = stringResource(R.string.set_clear_done)
 
+    LargeScreen(stringResource(R.string.set_title)) { inner ->
     Column(
-        Modifier.verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = top + 12.dp, bottom = 24.dp),
+        Modifier.padding(inner).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        Text(stringResource(R.string.set_title), style = MaterialTheme.typography.headlineMedium)
-
         Section(stringResource(R.string.set_profile)) {
             OutlinedTextField(
                 value = name,
@@ -208,6 +208,7 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
         Section(stringResource(R.string.set_about)) {
             Text(stringResource(R.string.set_version, BuildConfig.VERSION_NAME), style = MaterialTheme.typography.bodyMedium)
         }
+    }
     }
 
     if (confirmClear) {

@@ -1,6 +1,10 @@
 package com.healthstats.app.ui.components
 
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.animateIntAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -40,12 +44,18 @@ import com.healthstats.app.util.fmtInt
 import com.healthstats.app.util.fmtTime
 
 @Composable
-fun WorkoutRow(w: Workout, colored: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+fun WorkoutRow(
+    w: Workout,
+    colored: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    shape: Shape = MaterialTheme.shapes.medium,
+) {
     val sport = w.sport
     Card(
-        modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).clickable(onClick = onClick),
+        modifier.fillMaxWidth().springClick(shape, onClick),
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
-        shape = MaterialTheme.shapes.medium,
+        shape = shape,
     ) {
         Row(
             Modifier.padding(14.dp),
@@ -89,6 +99,7 @@ fun StepsRing(steps: Int, goal: Int, modifier: Modifier = Modifier) {
     val target = if (goal > 0) (steps.toFloat() / goal).coerceIn(0f, 1f) else 0f
     val progress = remember { Animatable(0f) }
     LaunchedEffect(target) { progress.animateTo(target, spatialSpring()) }
+    val shownSteps by animateIntAsState(steps, animationSpec = tween(900), label = "steps")
     val track = MaterialTheme.colorScheme.surfaceContainerHighest
     val color = MaterialTheme.colorScheme.primary
     Box(modifier.size(150.dp), contentAlignment = Alignment.Center) {
@@ -102,7 +113,7 @@ fun StepsRing(steps: Int, goal: Int, modifier: Modifier = Modifier) {
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(fmtInt(steps), style = MaterialTheme.typography.headlineMedium)
+            Text(fmtInt(shownSteps), style = MaterialTheme.typography.headlineMedium)
             Text(
                 "${(target * 100).toInt()} %",
                 style = MaterialTheme.typography.labelMedium,
@@ -122,6 +133,38 @@ fun MetricTile(label: String, value: String, modifier: Modifier = Modifier) {
         Column(Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
             Text(value, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+}
+
+/** Card for one sport: big cookie icon, name, count and total time. Tap to filter. */
+@Composable
+fun SportSummaryCard(
+    sport: com.healthstats.app.data.model.SportInfo,
+    colored: Boolean,
+    count: Int,
+    totalSec: Long,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val shape = MaterialTheme.shapes.large
+    val container = if (selected) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceContainer
+    Card(
+        modifier.springClick(shape, onClick),
+        colors = CardDefaults.cardColors(containerColor = container),
+        shape = shape,
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            SportBadge(sport, colored, size = 52.dp)
+            Column {
+                Text(sport.name, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    "$count · " + fmtDuration(totalSec),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
     }
 }
