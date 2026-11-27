@@ -134,4 +134,45 @@
     <string name="detail_splits">Splits</string>
     <string name="home_streak">%1$d-day streak</string>
     <string name="home_week_totals">Week totals</string>
+    <string name="info">Explanation</string>
+    <string name="detail_hr_expl">Your heart rate during the workout. Drag your finger on the graph to see the value and the matching spot on the map. A high steady line is a steady effort; peaks are sprints or climbs.</string>
+    <string name="detail_zones_expl">Time spent in each zone, from your max heart rate (220 minus your age). Z1–Z2: easy, builds your base. Z3: moderate. Z4–Z5: hard, builds speed but tires you fast.</string>
+    <string name="detail_hist">Heart rate distribution</string>
+    <string name="detail_hist_expl">How many minutes you spent at each heart rate (10 bpm steps). One tall bar means a very steady effort; a wide spread means changing intensity.</string>
+    <string name="detail_effort">Effort</string>
+    <string name="detail_effort_expl">Effort score: minutes in each zone multiplied by the zone number (Edwards method). Under 50 light, 50–100 moderate, 100–200 hard, over 200 very hard. Intensity is your average heart rate as a share of your max.
+
+Heart drift compares the second half of the workout to the first. Under 5 % means well paced; more can mean fatigue, heat or lack of water.</string>
+    <string name="effort_light">Light</string>
+    <string name="effort_moderate">Moderate</string>
+    <string name="effort_hard">Hard</string>
+    <string name="effort_extreme">Very hard</string>
+    <string name="detail_intensity">Intensity</string>
+    <string name="detail_drift">Heart drift</string>
+    <string name="detail_speed_chart">Speed</string>
+    <string name="detail_speed_expl">Speed along the workout, smoothed. Drag to compare with the heart rate: if your heart rate rises while speed stays flat, you are getting tired.</string>
+    <string name="detail_elev">Elevation profile</string>
+    <string name="detail_elev_expl">Altitude along the route. Climb is the total height gained, descent the total lost. Climbs raise your heart rate even at low speed.</string>
+    <string name="detail_gain">Climb</string>
+    <string name="detail_loss">Descent</string>
+    <string name="detail_power">Power</string>
+    <string name="detail_power_expl">Power in watts. Steady power with a rising heart rate shows fatigue; more watts at the same heart rate shows progress.</string>
+    <string name="sport_view">Sport statistics</string>
+    <string name="sport_trend">Trend</string>
+    <string name="sport_expl_hr">Average heart rate of each session. If it goes down for the same effort, your fitness is improving.</string>
+    <string name="sport_expl_dist">Distance of each session. Slow, regular growth is the safest way to progress.</string>
+    <string name="sport_expl_dur">Duration of each session. Drag on the graph to see a session.</string>
+    <string name="sport_expl_speed">Average speed of each session. Faster at the same heart rate means progress.</string>
+    <string name="sport_expl_kcal">Calories burned in each session.</string>
+    <string name="sport_hist">Intensity of your sessions</string>
+    <string name="sport_hist_expl">Number of sessions for each average heart rate (10 bpm steps). Most sessions in the middle is a balanced training; too many at the top can lead to overtraining.</string>
+    <string name="sport_recent">Recent sessions</string>
+    <string name="sport_sessions">Sessions</string>
+    <string name="sport_total_time">Total time</string>
+    <string name="charts_hr">Heart rate</string>
+    <string name="charts_expl_steps">Steps per day (or per week / month on long periods). Touch a bar to see its value.</string>
+    <string name="charts_expl_kcal">Calories burned. Each bar is a day, a week or a month.</string>
+    <string name="charts_expl_distance">Distance walked, run or ridden, in kilometers.</string>
+    <string name="charts_expl_workouts">Number of workouts. Regularity matters more than one big session.</string>
+    <string name="charts_expl_hr">Average heart rate of your workouts. A lower value for the same effort means you are getting fitter.</string>
 </resources>

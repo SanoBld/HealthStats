@@ -71,6 +71,8 @@ private fun buildSeries(metric: ChartMetric, periodDays: Int, days: List<DayStat
     val today = LocalDate.now()
     val byDay = days.associateBy { it.epochDay }
     val workoutsByDay = workouts.groupingBy { Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().toEpochDay() }.eachCount()
+    val hrByDay = workouts.filter { it.hrAvg > 0 }.groupBy { Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().toEpochDay() }
+        .mapValues { (_, l) -> l.map { it.hrAvg }.average() }
     val first = listOfNotNull(days.firstOrNull()?.epochDay, workouts.lastOrNull()?.let { Instant.ofEpochMilli(it.start).atZone(zone).toLocalDate().toEpochDay() }).minOrNull()
     val start = if (periodDays > 0) today.minusDays(periodDays - 1L) else (first?.let { LocalDate.ofEpochDay(it) } ?: today.minusDays(29))
     val windowDays = (ChronoUnit.DAYS.between(start, today) + 1).toInt().coerceAtLeast(1)
@@ -87,9 +89,11 @@ private fun buildSeries(metric: ChartMetric, periodDays: Int, days: List<DayStat
             ChartMetric.Kcal -> byDay[e]?.kcal ?: 0.0
             ChartMetric.Distance -> (byDay[e]?.distanceM ?: 0.0) / 1000.0
             ChartMetric.Workouts -> (workoutsByDay[e] ?: 0).toDouble()
+            ChartMetric.Heart -> hrByDay[e] ?: 0.0
         }
     }
     val sums = LinkedHashMap<Long, Double>()
+    val counts = HashMap<Long, Int>()
     val firstDates = LinkedHashMap<Long, LocalDate>()
     var d = start
     while (!d.isAfter(today)) {
@@ -98,14 +102,16 @@ private fun buildSeries(metric: ChartMetric, periodDays: Int, days: List<DayStat
             1 -> ChronoUnit.DAYS.between(start, d) / 7
             else -> d.year * 12L + d.monthValue
         }
-        sums[key] = (sums[key] ?: 0.0) + valueOf(d)
+        val v = valueOf(d)
+        sums[key] = (sums[key] ?: 0.0) + v
+        if (v > 0) counts[key] = (counts[key] ?: 0) + 1
         if (key !in firstDates) firstDates[key] = d
         d = d.plusDays(1)
     }
     val dayFmt = DateTimeFormatter.ofPattern("d MMM", loc)
     val monthFmt = DateTimeFormatter.ofPattern("MMM yy", loc)
     return Series(
-        sums.values.map { it.toFloat() },
+        sums.map { (k, v) -> (if (metric == ChartMetric.Heart) v / (counts[k] ?: 1).coerceAtLeast(1) else v).toFloat() },
         firstDates.values.map { if (mode == 2) monthFmt.format(it) else dayFmt.format(it) },
         windowDays,
     )
@@ -116,10 +122,11 @@ private fun format(metric: ChartMetric, v: Float): String = when (metric) {
     ChartMetric.Kcal -> fmtInt(v.toInt()) + " kcal"
     ChartMetric.Distance -> String.format(Locale.getDefault(), "%.1f km", v)
     ChartMetric.Workouts -> v.toInt().toString()
+    ChartMetric.Heart -> "${v.toInt()} bpm"
 }
 
 @Composable
-fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) -> Unit) {
+fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) -> Unit, onOpenSport: (Int) -> Unit) {
     val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     var metricIdx by rememberSaveable { mutableIntStateOf(0) }
     var period by rememberSaveable { mutableIntStateOf(30) } // 0 = all
@@ -172,11 +179,29 @@ fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) 
                         color = MaterialTheme.colorScheme.primary,
                     )
                     BarChart(series.values, series.labels, color, selected, { selected = it })
+                    Text(
+                        stringResource(
+                            when (metric) {
+                                ChartMetric.Steps -> R.string.charts_expl_steps
+                                ChartMetric.Kcal -> R.string.charts_expl_kcal
+                                ChartMetric.Distance -> R.string.charts_expl_distance
+                                ChartMetric.Workouts -> R.string.charts_expl_workouts
+                                ChartMetric.Heart -> R.string.charts_expl_hr
+                            }
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatTile(stringResource(R.string.charts_total), format(metric, total), Modifier.weight(1f))
-                StatTile(stringResource(R.string.charts_avg), format(metric, avg), Modifier.weight(1f))
+                if (metric == ChartMetric.Heart) {
+                    val nz = series.values.filter { it > 0 }
+                    StatTile(stringResource(R.string.charts_avg), format(metric, nz.average().toFloat()), Modifier.weight(1f))
+                } else {
+                    StatTile(stringResource(R.string.charts_total), format(metric, total), Modifier.weight(1f))
+                    StatTile(stringResource(R.string.charts_avg), format(metric, avg), Modifier.weight(1f))
+                }
                 StatTile(stringResource(R.string.charts_best), format(metric, best), Modifier.weight(1f))
             }
         }
@@ -188,7 +213,7 @@ fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) 
             }
         }
         if (inPeriod.isNotEmpty()) {
-            SportBreakdown(inPeriod, colored)
+            SportBreakdown(inPeriod, colored, onOpenSport)
             Records(inPeriod, colored, onOpenWorkout)
         }
     }
@@ -196,7 +221,7 @@ fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) 
 }
 
 @Composable
-private fun SportBreakdown(workouts: List<Workout>, colored: Boolean) {
+private fun SportBreakdown(workouts: List<Workout>, colored: Boolean, onOpenSport: (Int) -> Unit) {
     val groups = remember(workouts) {
         workouts.groupBy { it.type }.map { (t, l) -> Triple(t, l.size, l.sumOf { it.durationSec }) }.sortedByDescending { it.third }
     }
@@ -215,7 +240,11 @@ private fun SportBreakdown(workouts: List<Workout>, colored: Boolean) {
                 }
             }
             groups.forEach { (type, count, sec) ->
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Row(
+                    Modifier.fillMaxWidth().springClick(MaterialTheme.shapes.medium) { onOpenSport(type) }.padding(vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
                     SportBadge(sportOf(type), colored, size = 40.dp)
                     Column(Modifier.weight(1f)) {
                         Text(sportOf(type).name, style = MaterialTheme.typography.titleSmall)
@@ -231,7 +260,7 @@ private fun SportBreakdown(workouts: List<Workout>, colored: Boolean) {
 private class Record(val label: String, val value: String, val w: Workout)
 
 @Composable
-private fun Records(workouts: List<Workout>, colored: Boolean, onOpen: (String) -> Unit) {
+internal fun Records(workouts: List<Workout>, colored: Boolean, onOpen: (String) -> Unit) {
     val lDist = stringResource(R.string.rec_distance)
     val lDur = stringResource(R.string.rec_duration)
     val lPace = stringResource(R.string.rec_pace)

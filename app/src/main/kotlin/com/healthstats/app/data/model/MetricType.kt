@@ -9,4 +9,5 @@ enum class ChartMetric(@StringRes val label: Int) {
     Kcal(R.string.charts_kcal),
     Distance(R.string.charts_distance),
     Workouts(R.string.charts_workouts),
+    Heart(R.string.charts_hr),
 }

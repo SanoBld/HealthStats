@@ -11,6 +11,7 @@ import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
@@ -22,6 +23,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationRail
+import androidx.compose.material3.NavigationRailItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -51,6 +54,8 @@ import com.healthstats.app.ui.screens.detail.WorkoutDetailScreen
 import com.healthstats.app.ui.screens.home.HomeScreen
 import com.healthstats.app.ui.screens.onboarding.OnboardingScreen
 import com.healthstats.app.ui.screens.settings.SettingsScreen
+import com.healthstats.app.ui.screens.sport.SportScreen
+import com.healthstats.app.ui.components.isWide
 import com.healthstats.app.ui.theme.NavMillis
 import com.healthstats.app.util.openHealthConnect
 import com.healthstats.app.util.openHealthConnectStore
@@ -93,11 +98,12 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
     val entry by nav.currentBackStackEntryAsState()
     val route = entry?.destination?.route
     val showBar = Tabs.any { it.route == route }
+    val wide = isWide()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         bottomBar = {
-            AnimatedVisibility(
+            if (!wide) AnimatedVisibility(
                 visible = showBar,
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
@@ -121,19 +127,39 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
             }
         },
     ) { inner ->
+        Row {
+        // Tablets and unfolded phones: side rail instead of the bottom bar
+        if (wide && showBar) {
+            NavigationRail {
+                Tabs.forEach { tab ->
+                    NavigationRailItem(
+                        selected = route == tab.route,
+                        onClick = {
+                            nav.navigate(tab.route) {
+                                popUpTo(Routes.Home) { saveState = true }
+                                launchSingleTop = true
+                                restoreState = true
+                            }
+                        },
+                        icon = { Icon(tab.icon, null) },
+                        label = { Text(stringResource(tab.label)) },
+                    )
+                }
+            }
+        }
         NavHost(
             navController = nav,
             startDestination = start,
-            modifier = Modifier.padding(bottom = inner.calculateBottomPadding()),
+            modifier = Modifier.weight(1f).padding(bottom = inner.calculateBottomPadding()),
             enterTransition = {
-                if (targetState.destination.route == Routes.Detail) {
+                if (targetState.destination.route.let { it == Routes.Detail || it == Routes.Sport }) {
                     slideInHorizontally(tween(NavMillis)) { it / 5 } + fadeIn(tween(NavMillis)) + scaleIn(tween(NavMillis), 0.94f)
                 } else {
                     fadeIn(tween(NavMillis, delayMillis = 60)) + scaleIn(tween(NavMillis, delayMillis = 60), 0.92f)
                 }
             },
             exitTransition = {
-                if (targetState.destination.route == Routes.Detail) {
+                if (targetState.destination.route.let { it == Routes.Detail || it == Routes.Sport }) {
                     fadeOut(tween(NavMillis / 2)) + scaleOut(tween(NavMillis), 0.96f)
                 } else {
                     fadeOut(tween(NavMillis / 2))
@@ -141,7 +167,7 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
             },
             popEnterTransition = { fadeIn(tween(NavMillis)) + scaleIn(tween(NavMillis), 0.96f) },
             popExitTransition = {
-                if (initialState.destination.route == Routes.Detail) {
+                if (initialState.destination.route.let { it == Routes.Detail || it == Routes.Sport }) {
                     slideOutHorizontally(tween(NavMillis)) { it / 5 } + fadeOut(tween(NavMillis / 2)) + scaleOut(tween(NavMillis), 0.94f)
                 } else {
                     fadeOut(tween(NavMillis / 2))
@@ -175,10 +201,22 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
                 )
             }
             composable(Routes.Activities) {
-                ActivitiesScreen(settings, health) { nav.navigate(Routes.detail(it)) }
+                ActivitiesScreen(settings, health, { nav.navigate(Routes.detail(it)) }, { nav.navigate(Routes.sport(it)) })
             }
-            composable(Routes.Charts) { ChartsScreen(health, settings.sportColors) { nav.navigate(Routes.detail(it)) } }
+            composable(Routes.Charts) { ChartsScreen(health, settings.sportColors, { nav.navigate(Routes.detail(it)) }, { nav.navigate(Routes.sport(it)) }) }
             composable(Routes.Settings) { SettingsScreen(settings, health, vm, connect) }
+            composable(
+                Routes.Sport,
+                arguments = listOf(navArgument("type") { type = NavType.IntType }),
+            ) { e ->
+                SportScreen(
+                    type = e.arguments?.getInt("type") ?: 0,
+                    settings = settings,
+                    health = health,
+                    onBack = { nav.popBackStack() },
+                    onOpenWorkout = { nav.navigate(Routes.detail(it)) },
+                )
+            }
             composable(
                 Routes.Detail,
                 arguments = listOf(navArgument("id") { type = NavType.StringType }),
@@ -186,6 +224,7 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
                 val id = e.arguments?.getString("id")
                 if (id != null) WorkoutDetailScreen(id, settings) { nav.popBackStack() }
             }
+        }
         }
     }
 

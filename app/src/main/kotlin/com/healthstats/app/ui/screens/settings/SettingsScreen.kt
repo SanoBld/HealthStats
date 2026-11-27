@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.rememberScrollState
@@ -95,7 +96,7 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
 
     LargeScreen(stringResource(R.string.set_title)) { inner ->
     Column(
-        Modifier.padding(inner).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
+        Modifier.padding(inner).imePadding().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
         Section(stringResource(R.string.set_profile)) {
@@ -161,11 +162,10 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
         }
 
         Section(stringResource(R.string.set_data)) {
-            if (!health.permitted) {
-                Button(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
-            } else {
+            if (health.permitted) {
                 Button(onClick = { vm.sync() }, enabled = !health.loading) { Text(stringResource(R.string.sync_now)) }
             }
+            TextButton(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
             TextButton(onClick = { openHealthConnect(ctx) }) { Text(stringResource(R.string.set_open_hc)) }
             TextButton(onClick = { confirmClear = true }) { Text(stringResource(R.string.set_clear_cache)) }
         }

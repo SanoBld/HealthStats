@@ -9,6 +9,9 @@ object Routes {
     const val Charts = "charts"
     const val Settings = "settings"
     const val Detail = "workout/{id}"
+    const val Sport = "sport/{type}"
+
+    fun sport(type: Int) = "sport/$type"
 
     fun detail(id: String) = "workout/" + Uri.encode(id)
 }

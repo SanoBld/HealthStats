@@ -2,7 +2,7 @@ package com.healthstats.app.ui.components
 
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -56,7 +56,7 @@ fun BarChart(
                     }
                 }
                 .pointerInput(values.size) {
-                    detectDragGestures { change, _ ->
+                    detectHorizontalDragGestures { change, _ ->
                         change.consume()
                         if (values.isNotEmpty()) select((change.position.x / size.width * values.size).toInt().coerceIn(0, values.size - 1))
                     }
@@ -112,7 +112,7 @@ fun LineChart(
                 )
             }
             .pointerInput(Unit) {
-                detectDragGestures { change, _ ->
+                detectHorizontalDragGestures { change, _ ->
                     change.consume()
                     update((change.position.x / size.width).coerceIn(0f, 1f))
                 }

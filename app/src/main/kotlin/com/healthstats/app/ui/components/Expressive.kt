@@ -6,7 +6,18 @@ import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import com.healthstats.app.R
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.material3.LargeTopAppBar
@@ -57,6 +68,7 @@ fun Modifier.appear(index: Int): Modifier {
 fun LargeScreen(
     title: String,
     modifier: Modifier = Modifier,
+    onBack: (() -> Unit)? = null,
     actions: @Composable RowScope.() -> Unit = {},
     content: @Composable (PaddingValues) -> Unit,
 ) {
@@ -68,6 +80,9 @@ fun LargeScreen(
         topBar = {
             LargeTopAppBar(
                 title = { Text(title) },
+                navigationIcon = {
+                    if (onBack != null) IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.back)) }
+                },
                 actions = actions,
                 scrollBehavior = scroll,
                 colors = TopAppBarDefaults.largeTopAppBarColors(
@@ -76,6 +91,11 @@ fun LargeScreen(
                 ),
             )
         },
-        content = content,
+        content = { inner ->
+            // On wide screens the content is centered and at most 720 dp wide
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+                Box(Modifier.widthIn(max = 720.dp).fillMaxSize()) { content(inner) }
+            }
+        },
     )
 }

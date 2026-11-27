@@ -9,7 +9,10 @@ import androidx.health.connect.client.records.ExerciseRouteResult
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.HeartRateRecord
 import androidx.health.connect.client.records.HeightRecord
+import androidx.health.connect.client.records.PowerRecord
+import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.records.RestingHeartRateRecord
+import androidx.health.connect.client.records.SpeedRecord
 import androidx.health.connect.client.records.SleepSessionRecord
 import androidx.health.connect.client.records.StepsRecord
 import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
@@ -34,6 +37,7 @@ import java.time.Instant
 import java.time.LocalDateTime
 import java.time.Period
 import java.time.ZoneId
+import kotlin.reflect.KClass
 
 /** The only place that talks to Health Connect. Returns plain app models. */
 class HealthConnectManager(private val ctx: Context) {
@@ -164,23 +168,26 @@ class HealthConnectManager(private val ctx: Context) {
         }
     }
 
-    // ---- Heart rate ----
+    // ---- Samples during a workout (heart rate, speed, power) ----
 
-    suspend fun heartRate(startMs: Long, endMs: Long, source: String): List<TimedValue> {
+    /** Reads one kind of record over a time range. Uses the workout's app first, then all apps. */
+    private suspend fun <T : Record> series(
+        type: KClass<T>, startMs: Long, endMs: Long, source: String, extract: (T) -> List<TimedValue>,
+    ): List<TimedValue> {
         suspend fun read(origins: Set<DataOrigin>): List<TimedValue> {
             val out = ArrayList<TimedValue>()
             var token: String? = null
             do {
                 val res = client.readRecords(
                     ReadRecordsRequest(
-                        recordType = HeartRateRecord::class,
+                        recordType = type,
                         timeRangeFilter = range(startMs, endMs),
                         dataOriginFilter = origins,
                         pageSize = 1000,
                         pageToken = token,
                     )
                 )
-                for (rec in res.records) for (s in rec.samples) out.add(TimedValue(s.time.toEpochMilli(), s.beatsPerMinute.toDouble()))
+                for (rec in res.records) out.addAll(extract(rec))
                 token = res.pageToken
             } while (!token.isNullOrEmpty())
             return out.sortedBy { it.time }
@@ -189,6 +196,23 @@ class HealthConnectManager(private val ctx: Context) {
         if (!first.isNullOrEmpty()) return first
         return safe { read(emptySet()) } ?: emptyList()
     }
+
+    suspend fun heartRate(startMs: Long, endMs: Long, source: String): List<TimedValue> =
+        series(HeartRateRecord::class, startMs, endMs, source) { r ->
+            r.samples.map { TimedValue(it.time.toEpochMilli(), it.beatsPerMinute.toDouble()) }
+        }
+
+    /** Speed in km/h. */
+    suspend fun speed(startMs: Long, endMs: Long, source: String): List<TimedValue> =
+        series(SpeedRecord::class, startMs, endMs, source) { r ->
+            r.samples.map { TimedValue(it.time.toEpochMilli(), it.speed.inMetersPerSecond * 3.6) }
+        }
+
+    /** Power in watts. */
+    suspend fun power(startMs: Long, endMs: Long, source: String): List<TimedValue> =
+        series(PowerRecord::class, startMs, endMs, source) { r ->
+            r.samples.map { TimedValue(it.time.toEpochMilli(), it.power.inWatts) }
+        }
 
     // ---- Daily totals ----
 

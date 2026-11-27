@@ -45,7 +45,7 @@ import com.healthstats.app.util.fmtMonth
 private class TypeStat(val type: Int, val count: Int, val sec: Long)
 
 @Composable
-fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: (String) -> Unit) {
+fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: (String) -> Unit, onOpenSport: (Int) -> Unit) {
     var query by rememberSaveable { mutableStateOf("") }
     var sportFilter by rememberSaveable { mutableStateOf(-1) } // -1 = all
 
@@ -108,6 +108,14 @@ fun ActivitiesScreen(settings: AppSettings, health: HealthState, onOpenWorkout: 
                             )
                         }
                     }
+                }
+            }
+            if (sportFilter != -1) {
+                item {
+                    androidx.compose.material3.FilledTonalButton(
+                        onClick = { onOpenSport(sportFilter) },
+                        modifier = Modifier.padding(bottom = 12.dp),
+                    ) { Text(stringResource(R.string.sport_view)) }
                 }
             }
             if (health.loading && health.workouts.isEmpty()) {

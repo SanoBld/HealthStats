@@ -215,6 +215,8 @@ class HealthRepository(
     fun pointsOf(route: androidx.health.connect.client.records.ExerciseRoute): List<RoutePoint> = hc.pointsOf(route)
 
     suspend fun heartRate(w: Workout): List<TimedValue> = hc.heartRate(w.start, w.end, w.source)
+    suspend fun speed(w: Workout): List<TimedValue> = hc.speed(w.start, w.end, w.source)
+    suspend fun power(w: Workout): List<TimedValue> = hc.power(w.start, w.end, w.source)
 
     suspend fun clearCache() {
         cache.clear()

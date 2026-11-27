@@ -133,4 +133,45 @@
     <string name="detail_splits">Kilomètres</string>
     <string name="home_streak">%1$d jours d\'affilée</string>
     <string name="home_week_totals">Bilan de la semaine</string>
+    <string name="info">Explication</string>
+    <string name="detail_hr_expl">Votre fréquence cardiaque pendant la séance. Glissez le doigt sur le graphique pour voir la valeur et l\'endroit correspondant sur la carte. Une ligne haute et stable = effort régulier ; les pics = sprints ou côtes.</string>
+    <string name="detail_zones_expl">Temps passé dans chaque zone, d\'après votre FC max (220 moins votre âge). Z1–Z2 : facile, construit l\'endurance. Z3 : modéré. Z4–Z5 : intense, développe la vitesse mais fatigue vite.</string>
+    <string name="detail_hist">Répartition de la FC</string>
+    <string name="detail_hist_expl">Minutes passées à chaque fréquence cardiaque (par pas de 10 bpm). Une grande barre = effort très régulier ; une répartition large = intensité variable.</string>
+    <string name="detail_effort">Effort</string>
+    <string name="detail_effort_expl">Score d\'effort : minutes dans chaque zone multipliées par le numéro de la zone (méthode d\'Edwards). Moins de 50 léger, 50–100 modéré, 100–200 intense, plus de 200 très intense. L\'intensité est votre FC moyenne en % de votre max.
+
+La dérive cardiaque compare la 2e moitié de la séance à la 1re. Moins de 5 % = bien géré ; plus peut indiquer fatigue, chaleur ou manque d\'eau.</string>
+    <string name="effort_light">Léger</string>
+    <string name="effort_moderate">Modéré</string>
+    <string name="effort_hard">Intense</string>
+    <string name="effort_extreme">Très intense</string>
+    <string name="detail_intensity">Intensité</string>
+    <string name="detail_drift">Dérive FC</string>
+    <string name="detail_speed_chart">Vitesse</string>
+    <string name="detail_speed_expl">Vitesse pendant la séance, lissée. Glissez pour comparer avec la FC : si la FC monte alors que la vitesse reste stable, vous êtes en train de vous fatiguer.</string>
+    <string name="detail_elev">Profil d\'altitude</string>
+    <string name="detail_elev_expl">Altitude le long du parcours. Le dénivelé + est la hauteur totale montée, le − la hauteur totale descendue. Les côtes font monter la FC même à faible vitesse.</string>
+    <string name="detail_gain">Dénivelé +</string>
+    <string name="detail_loss">Dénivelé −</string>
+    <string name="detail_power">Puissance</string>
+    <string name="detail_power_expl">Puissance en watts. Puissance stable avec une FC qui monte = fatigue ; plus de watts à FC égale = progrès.</string>
+    <string name="sport_view">Statistiques du sport</string>
+    <string name="sport_trend">Évolution</string>
+    <string name="sport_expl_hr">FC moyenne de chaque séance. Si elle baisse pour un même effort, votre forme s\'améliore.</string>
+    <string name="sport_expl_dist">Distance de chaque séance. Une progression lente et régulière est la plus sûre.</string>
+    <string name="sport_expl_dur">Durée de chaque séance. Glissez sur le graphique pour voir une séance.</string>
+    <string name="sport_expl_speed">Vitesse moyenne de chaque séance. Plus vite à FC égale = progrès.</string>
+    <string name="sport_expl_kcal">Calories brûlées à chaque séance.</string>
+    <string name="sport_hist">Intensité de vos séances</string>
+    <string name="sport_hist_expl">Nombre de séances par FC moyenne (pas de 10 bpm). La plupart au milieu = entraînement équilibré ; trop en haut peut mener au surentraînement.</string>
+    <string name="sport_recent">Séances récentes</string>
+    <string name="sport_sessions">Séances</string>
+    <string name="sport_total_time">Temps total</string>
+    <string name="charts_hr">Fréquence cardiaque</string>
+    <string name="charts_expl_steps">Pas par jour (ou par semaine / mois sur les longues périodes). Touchez une barre pour voir sa valeur.</string>
+    <string name="charts_expl_kcal">Calories brûlées. Chaque barre est un jour, une semaine ou un mois.</string>
+    <string name="charts_expl_distance">Distance marchée, courue ou parcourue, en kilomètres.</string>
+    <string name="charts_expl_workouts">Nombre de séances. La régularité compte plus qu\'une grosse séance.</string>
+    <string name="charts_expl_hr">FC moyenne de vos séances. Une valeur plus basse pour le même effort = vous progressez.</string>
 </resources>

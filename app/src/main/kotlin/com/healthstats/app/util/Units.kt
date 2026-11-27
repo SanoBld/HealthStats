@@ -113,3 +113,32 @@ fun splitsOf(points: List<RoutePoint>): List<Split> {
     if (rest >= 150) out.add(Split(nextKm, ((points.last().time - lastKmTime) / 1000).coerceAtLeast(1L), rest))
     return out
 }
+
+/** Speed in km/h computed from the route (used when Health Connect has no speed data). */
+fun derivedSpeed(points: List<RoutePoint>): List<TimedValue> {
+    if (!hasTimes(points)) return emptyList()
+    val w = 6
+    val out = ArrayList<TimedValue>()
+    for (i in w until points.size) {
+        val dt = (points[i].time - points[i - w].time) / 1000.0
+        if (dt <= 0) continue
+        var d = 0.0
+        for (k in i - w + 1..i) d += distanceM(points[k - 1], points[k])
+        out.add(TimedValue(points[i].time, d / dt * 3.6))
+    }
+    return downsample(out, 240)
+}
+
+/** Total climb and descent in meters (altitude is smoothed first), or null without altitude. */
+fun elevationOf(points: List<RoutePoint>): Pair<Double, Double>? {
+    val alts = points.map { it.alt }.filter { !it.isNaN() }
+    if (alts.size < 5) return null
+    val sm = alts.indices.map { i -> alts.subList(maxOf(0, i - 2), minOf(alts.size - 1, i + 2) + 1).average() }
+    var up = 0.0
+    var down = 0.0
+    for (i in 1 until sm.size) {
+        val d = sm[i] - sm[i - 1]
+        if (d > 0) up += d else down -= d
+    }
+    return up to down
+}

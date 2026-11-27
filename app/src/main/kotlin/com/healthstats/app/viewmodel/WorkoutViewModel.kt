@@ -37,6 +37,12 @@ data class DetailState(
     val hr: List<TimedValue> = emptyList(), // thinned, for the chart
     val zonesSec: List<Long> = emptyList(), // seconds in zone 1..5
     val maxHr: Int = 0,
+    val hrHist: List<Pair<Int, Long>> = emptyList(), // heart rate bucket (bpm) to seconds
+    val effort: Int = 0,                              // Edwards score
+    val intensityPct: Int = 0,                        // average HR as % of max
+    val driftPct: Double? = null,                     // 2nd half vs 1st half
+    val speed: List<TimedValue> = emptyList(),        // km/h, thinned
+    val power: List<TimedValue> = emptyList(),        // watts, thinned
 )
 
 /** Loads the route and the heart rate of one workout. */
@@ -56,6 +62,7 @@ class WorkoutViewModel(private val c: AppContainer, private val id: String) : Vi
             coroutineScope {
                 launch { loadRoute(w, settings) }
                 launch { loadHeartRate(w, settings) }
+                launch { loadSpeedPower(w) }
             }
         }
     }
@@ -90,7 +97,47 @@ class WorkoutViewModel(private val c: AppContainer, private val id: String) : Vi
             val dt = ((next - samples[i].time) / 1000).coerceIn(0L, 30L)
             zones[zoneOf(samples[i].value, maxHr)] += dt
         }
-        _detail.update { it.copy(hr = downsample(samples, 240), zonesSec = zones.toList(), maxHr = maxHr) }
+        val hist = java.util.TreeMap<Int, Long>()
+        for (i in samples.indices) {
+            val next = samples.getOrNull(i + 1)?.time ?: (samples[i].time + 5_000)
+            val dt = ((next - samples[i].time) / 1000).coerceIn(0L, 30L)
+            val key = (samples[i].value / 10).toInt() * 10
+            hist[key] = (hist[key] ?: 0L) + dt
+        }
+        // Fill empty buckets so the histogram has no holes
+        val lo = hist.firstKey()
+        val hi = hist.lastKey()
+        val filled = (lo..hi step 10).map { it to (hist[it] ?: 0L) }
+        val effort = zones.indices.sumOf { zones[it] / 60.0 * (it + 1) }.toInt()
+        val avgHr = samples.map { it.value }.average()
+        val mid = (w.start + w.end) / 2
+        val first = samples.filter { it.time < mid }.map { it.value }
+        val second = samples.filter { it.time >= mid }.map { it.value }
+        val drift = if (w.durationSec >= 20 * 60 && first.isNotEmpty() && second.isNotEmpty()) {
+            (second.average() / first.average() - 1.0) * 100.0
+        } else null
+        _detail.update {
+            it.copy(
+                hr = downsample(samples, 240),
+                zonesSec = zones.toList(),
+                maxHr = maxHr,
+                hrHist = filled,
+                effort = effort,
+                intensityPct = (avgHr / maxHr * 100).toInt(),
+                driftPct = drift,
+            )
+        }
+    }
+
+    private suspend fun loadSpeedPower(w: Workout) {
+        val sp = c.repository.speed(w)
+        val pw = c.repository.power(w)
+        _detail.update {
+            it.copy(
+                speed = if (sp.size >= 2) downsample(sp, 240) else emptyList(),
+                power = if (pw.size >= 2) downsample(pw, 240) else emptyList(),
+            )
+        }
     }
 
     companion object {
