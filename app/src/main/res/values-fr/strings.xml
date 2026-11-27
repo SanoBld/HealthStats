@@ -139,7 +139,7 @@
     <string name="detail_hist">Répartition de la FC</string>
     <string name="detail_hist_expl">Minutes passées à chaque fréquence cardiaque (par pas de 10 bpm). Une grande barre = effort très régulier ; une répartition large = intensité variable.</string>
     <string name="detail_effort">Effort</string>
-    <string name="detail_effort_expl">Score d\'effort : minutes dans chaque zone multipliées par le numéro de la zone (méthode d\'Edwards). Moins de 50 léger, 50–100 modéré, 100–200 intense, plus de 200 très intense. L\'intensité est votre FC moyenne en % de votre max.
+    <string name="detail_effort_expl" formatted="false">Score d\'effort : minutes dans chaque zone multipliées par le numéro de la zone (méthode d\'Edwards). Moins de 50 léger, 50–100 modéré, 100–200 intense, plus de 200 très intense. L\'intensité est votre FC moyenne en % de votre max.
 
 La dérive cardiaque compare la 2e moitié de la séance à la 1re. Moins de 5 % = bien géré ; plus peut indiquer fatigue, chaleur ou manque d\'eau.</string>
     <string name="effort_light">Léger</string>

@@ -140,7 +140,7 @@
     <string name="detail_hist">Heart rate distribution</string>
     <string name="detail_hist_expl">How many minutes you spent at each heart rate (10 bpm steps). One tall bar means a very steady effort; a wide spread means changing intensity.</string>
     <string name="detail_effort">Effort</string>
-    <string name="detail_effort_expl">Effort score: minutes in each zone multiplied by the zone number (Edwards method). Under 50 light, 50–100 moderate, 100–200 hard, over 200 very hard. Intensity is your average heart rate as a share of your max.
+    <string name="detail_effort_expl" formatted="false">Effort score: minutes in each zone multiplied by the zone number (Edwards method). Under 50 light, 50–100 moderate, 100–200 hard, over 200 very hard. Intensity is your average heart rate as a share of your max.
 
 Heart drift compares the second half of the workout to the first. Under 5 % means well paced; more can mean fatigue, heat or lack of water.</string>
     <string name="effort_light">Light</string>
