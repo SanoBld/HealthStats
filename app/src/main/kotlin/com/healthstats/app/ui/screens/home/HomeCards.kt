@@ -17,6 +17,7 @@ import androidx.compose.material.icons.rounded.FitnessCenter
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -39,6 +40,7 @@ import com.healthstats.app.ui.components.ExplainedCard
 import com.healthstats.app.ui.components.LineChart
 import com.healthstats.app.ui.components.MetricTile
 import com.healthstats.app.ui.components.StepsRing
+import com.healthstats.app.ui.components.WavyProgress
 import com.healthstats.app.ui.components.valueAt
 import com.healthstats.app.util.fmtDate
 import com.healthstats.app.util.fmtDistance
@@ -53,7 +55,9 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
-private val Red = Color(0xFFFF3B30)
+@Composable
+private fun tileTint(): Color = LocalContentColor.current.copy(alpha = 0.10f)
+
 private val Deep = Color(0xFF5E5CE6)
 private val Rem = Color(0xFFBF5AF2)
 private val Light = Color(0xFF64D2FF)
@@ -68,6 +72,7 @@ fun StepsCard(settings: AppSettings, days: List<DayStat>, today: LocalDate, modi
     var sel by remember { mutableStateOf<Int?>(null) }
     ExplainedCard(
         modifier = modifier,
+        container = MaterialTheme.colorScheme.primaryContainer,
         title = stringResource(R.string.home_steps_today),
         explanation = stringResource(R.string.home_steps_expl),
         value = sel?.let { labels[it] + " · " + fmtInt(week[it]) },
@@ -76,13 +81,13 @@ fun StepsCard(settings: AppSettings, days: List<DayStat>, today: LocalDate, modi
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                 StepsRing(stat?.steps ?: 0, settings.stepGoal)
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(stringResource(R.string.home_goal, fmtInt(settings.stepGoal)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(stringResource(R.string.home_goal, fmtInt(settings.stepGoal)), style = MaterialTheme.typography.bodySmall, color = LocalContentColor.current.copy(alpha = 0.7f))
                     if (stat != null && stat.distanceM > 0) Text(fmtDistance(stat.distanceM), style = MaterialTheme.typography.titleMedium)
                     if (stat != null && stat.kcal > 0) Text(fmtKcal(stat.kcal), style = MaterialTheme.typography.titleMedium)
                 }
             }
             if (week.any { it > 0 }) {
-                BarChart(week.map { it.toFloat() }, labels, MaterialTheme.colorScheme.primary, sel, { sel = it }, height = 100.dp)
+                BarChart(week.map { it.toFloat() }, labels, LocalContentColor.current, sel, { sel = it }, height = 100.dp)
             }
         }
     }
@@ -94,13 +99,13 @@ fun WeekCard(workoutDays: Set<LocalDate>, count: Int, goal: Int, totalSec: Long,
     val monday = today.with(DayOfWeek.MONDAY)
     Card(
         modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.tertiaryContainer, contentColor = MaterialTheme.colorScheme.onTertiaryContainer),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
                 Text(stringResource(R.string.home_week), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.home_week_goal, count, goal), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(stringResource(R.string.home_week_goal, count, goal), style = MaterialTheme.typography.bodySmall, color = LocalContentColor.current.copy(alpha = 0.7f))
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                 for (i in 0..6) {
@@ -109,23 +114,24 @@ fun WeekCard(workoutDays: Set<LocalDate>, count: Int, goal: Int, totalSec: Long,
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Box(
                             Modifier.size(36.dp).clip(CircleShape)
-                                .background(if (done) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHighest),
+                                .background(if (done) MaterialTheme.colorScheme.tertiary else LocalContentColor.current.copy(alpha = 0.12f)),
                             contentAlignment = Alignment.Center,
                         ) {
-                            if (done) Icon(Icons.Rounded.FitnessCenter, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onPrimary)
+                            if (done) Icon(Icons.Rounded.FitnessCenter, null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.onTertiary)
                         }
                         Text(
                             d.dayOfWeek.getDisplayName(TextStyle.NARROW, Locale.getDefault()),
                             style = MaterialTheme.typography.labelSmall,
-                            color = if (d == today) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                            color = if (d == today) MaterialTheme.colorScheme.tertiary else LocalContentColor.current.copy(alpha = 0.7f),
                         )
                     }
                 }
             }
+            WavyProgress(if (goal > 0) count.toFloat() / goal else 0f, color = MaterialTheme.colorScheme.tertiary)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                MetricTile(stringResource(R.string.detail_duration), fmtDuration(totalSec), Modifier.weight(1f))
-                if (distanceM > 0) MetricTile(stringResource(R.string.detail_distance), fmtDistance(distanceM), Modifier.weight(1f))
-                else if (kcal > 0) MetricTile(stringResource(R.string.detail_kcal), fmtKcal(kcal), Modifier.weight(1f))
+                MetricTile(stringResource(R.string.detail_duration), fmtDuration(totalSec), Modifier.weight(1f), tint = tileTint())
+                if (distanceM > 0) MetricTile(stringResource(R.string.detail_distance), fmtDistance(distanceM), Modifier.weight(1f), tint = tileTint())
+                else if (kcal > 0) MetricTile(stringResource(R.string.detail_kcal), fmtKcal(kcal), Modifier.weight(1f), tint = tileTint())
             }
         }
     }
@@ -149,6 +155,7 @@ fun SleepCard(m: BodyMetrics, modifier: Modifier = Modifier) {
     ).filter { it.second > 0 }
     ExplainedCard(
         modifier = modifier,
+        container = MaterialTheme.colorScheme.secondaryContainer,
         title = stringResource(R.string.sleep_title),
         explanation = stringResource(R.string.sleep_expl),
         value = (sel?.let { labels[it] + " · " } ?: "") + fmtDuration(shown.totalMin * 60),
@@ -163,7 +170,7 @@ fun SleepCard(m: BodyMetrics, modifier: Modifier = Modifier) {
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Box(Modifier.size(8.dp).clip(CircleShape).background(c))
-                                Text(name, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+                                Text(name, style = MaterialTheme.typography.labelSmall, color = LocalContentColor.current.copy(alpha = 0.7f), maxLines = 1)
                             }
                             Text(fmtDuration(min * 60), style = MaterialTheme.typography.titleSmall)
                         }
@@ -171,7 +178,7 @@ fun SleepCard(m: BodyMetrics, modifier: Modifier = Modifier) {
                 }
             }
             if (nights.size >= 2) {
-                BarChart(nights.map { it.totalMin / 60f }, labels, Deep, sel, { sel = it }, height = 110.dp)
+                BarChart(nights.map { it.totalMin / 60f }, labels, LocalContentColor.current, sel, { sel = it }, height = 110.dp)
             }
         }
     }
@@ -194,12 +201,13 @@ fun HeartCard(m: BodyMetrics, today: LocalDate, modifier: Modifier = Modifier) {
     val lHrv = stringResource(R.string.hrv_title)
     ExplainedCard(
         modifier = modifier,
+        container = MaterialTheme.colorScheme.errorContainer,
         title = stringResource(if (useRest) R.string.home_resting_hr else R.string.heart_avg_title),
         explanation = stringResource(if (useRest) R.string.heart_expl else R.string.heart_avg_expl),
         value = (valueAt(xs, ys, cursor) ?: ys.lastOrNull())?.let { "${it.toInt()} bpm" },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            if (ys.size >= 2) LineChart(xs, ys, Red, cursor, { cursor = it }, height = 120.dp)
+            if (ys.size >= 2) LineChart(xs, ys, LocalContentColor.current, cursor, { cursor = it }, height = 120.dp)
             val tiles = buildList {
                 todayHr?.let {
                     add(lAvg to "${it.avg} bpm")
@@ -210,7 +218,7 @@ fun HeartCard(m: BodyMetrics, today: LocalDate, modifier: Modifier = Modifier) {
             }
             if (tiles.isNotEmpty()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    tiles.take(4).forEach { (l, v) -> MetricTile(l, v, Modifier.weight(1f)) }
+                    tiles.take(4).forEach { (l, v) -> MetricTile(l, v, Modifier.weight(1f), tint = tileTint()) }
                 }
             }
         }
@@ -233,6 +241,7 @@ fun BodyCard(m: BodyMetrics, modifier: Modifier = Modifier) {
     val lSpo2 = stringResource(R.string.spo2_title)
     ExplainedCard(
         modifier = modifier,
+        container = MaterialTheme.colorScheme.surfaceContainerHigh,
         title = stringResource(R.string.body_title),
         explanation = stringResource(R.string.body_expl),
         value = (sel ?: w.lastOrNull())?.let { String.format(Locale.getDefault(), "%.1f kg", it.value) + (if (sel != null) " · " + fmtDate(it.time) else "") },
@@ -246,7 +255,7 @@ fun BodyCard(m: BodyMetrics, modifier: Modifier = Modifier) {
             }
             if (tiles.isNotEmpty()) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    tiles.forEach { (l, v) -> MetricTile(l, v, Modifier.weight(1f)) }
+                    tiles.forEach { (l, v) -> MetricTile(l, v, Modifier.weight(1f), tint = tileTint()) }
                 }
             }
         }

@@ -1,5 +1,8 @@
 # Changelog
 
+## 1.4.0
+- Material 3 Expressive look: floating pill navigation bar (the selected tab opens with its name), connected button groups (selected segment becomes a pill), big pill buttons, wavy progress, tonal colored cards on Home (steps, week, sleep, heart).
+
 ## 1.3.0
 - One loading logo per page (spinning cookie with a progress ring and the percentage). Big in the page when it has nothing to show, small in the top bar otherwise.
 - Sync reports its real progress (workouts, daily totals, sleep/heart/body, workout stats).

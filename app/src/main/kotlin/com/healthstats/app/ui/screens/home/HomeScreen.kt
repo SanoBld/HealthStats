@@ -26,6 +26,7 @@ import com.healthstats.app.R
 import com.healthstats.app.data.health.HealthState
 import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.ui.components.AppScreen
+import com.healthstats.app.ui.components.BigPillButton
 import com.healthstats.app.ui.components.EmptyState
 import com.healthstats.app.ui.components.ErrorCard
 import com.healthstats.app.ui.components.FullLoader
@@ -94,7 +95,7 @@ fun HomeScreen(
                         Column(Modifier.padding(22.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                             Text(stringResource(R.string.home_no_perm_title), style = MaterialTheme.typography.titleLarge, color = MaterialTheme.colorScheme.onPrimaryContainer)
                             Text(stringResource(R.string.home_no_perm_body), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onPrimaryContainer)
-                            Button(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
+                            BigPillButton(stringResource(R.string.hc_allow), onConnect)
                         }
                     }
                 }

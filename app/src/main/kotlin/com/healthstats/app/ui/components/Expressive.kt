@@ -1,6 +1,36 @@
 package com.healthstats.app.ui.components
 
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
+import com.healthstats.app.ui.theme.effectsSpring
+import kotlin.math.PI
+import kotlin.math.sin
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
@@ -99,4 +129,96 @@ fun AppScreen(
             }
         },
     )
+}
+
+/**
+ * Connected button group (Material 3 Expressive look): segments touching each other,
+ * the selected one turns into a full pill and the others keep small corners.
+ */
+@Composable
+fun <T> ConnectedButtonGroup(
+    options: List<Pair<T, String>>,
+    selected: T,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+        options.forEachIndexed { i, (value, label) ->
+            val on = value == selected
+            val start by animateDpAsState(if (on || i == 0) 28.dp else 8.dp, animationSpec = spatialSpring(), label = "start")
+            val end by animateDpAsState(if (on || i == options.lastIndex) 28.dp else 8.dp, animationSpec = spatialSpring(), label = "end")
+            val bg by animateColorAsState(
+                if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceContainerHigh,
+                animationSpec = effectsSpring(), label = "bg",
+            )
+            val shape = RoundedCornerShape(topStart = start, bottomStart = start, topEnd = end, bottomEnd = end)
+            Box(
+                Modifier.height(48.dp).springClick(shape) { onSelect(value) }.background(bg),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    label,
+                    Modifier.padding(horizontal = 20.dp),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface,
+                    maxLines = 1,
+                )
+            }
+        }
+    }
+}
+
+/** A wavy progress bar that moves, with a flat track after the progress (like the wavy slider of Material 3 Expressive). */
+@Composable
+fun WavyProgress(
+    progress: Float,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.primary,
+    track: Color = LocalContentColor.current.copy(alpha = 0.15f),
+) {
+    val t = rememberInfiniteTransition(label = "wavy")
+    val phase by t.animateFloat(
+        initialValue = 0f, targetValue = (2 * PI).toFloat(),
+        animationSpec = infiniteRepeatable(tween(1800, easing = LinearEasing)),
+        label = "phase",
+    )
+    val p by animateFloatAsState(progress.coerceIn(0f, 1f), animationSpec = spatialSpring(), label = "wavyProgress")
+    Canvas(modifier.fillMaxWidth().height(22.dp)) {
+        val w = size.width
+        val h = size.height
+        val stroke = 6.dp.toPx()
+        val amp = 4.dp.toPx()
+        val len = 30.dp.toPx()
+        val end = w * p.coerceIn(0f, 1f)
+        drawLine(track, Offset(end, h / 2), Offset(w, h / 2), strokeWidth = stroke, cap = StrokeCap.Round)
+        if (end > 1f) {
+            val path = Path()
+            path.moveTo(0f, h / 2)
+            var x = 0f
+            while (x <= end) {
+                path.lineTo(x, h / 2 + amp * sin(x / len * 2f * PI.toFloat() + phase))
+                x += 3f
+            }
+            drawPath(path, color, style = Stroke(stroke, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+/** Big pill-shaped main button. */
+@Composable
+fun BigPillButton(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    tonal: Boolean = false,
+) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(56.dp),
+        enabled = enabled,
+        shape = CircleShape,
+        contentPadding = PaddingValues(horizontal = 28.dp),
+        colors = if (tonal) ButtonDefaults.filledTonalButtonColors() else ButtonDefaults.buttonColors(),
+    ) { Text(text, style = MaterialTheme.typography.titleMedium) }
 }

@@ -2,6 +2,25 @@ package com.healthstats.app.ui.navigation
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import com.healthstats.app.ui.theme.effectsSpring
+import com.healthstats.app.ui.theme.spatialSpring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -108,20 +127,11 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
                 enter = slideInVertically { it } + fadeIn(),
                 exit = slideOutVertically { it } + fadeOut(),
             ) {
-                NavigationBar {
-                    Tabs.forEach { tab ->
-                        NavigationBarItem(
-                            selected = route == tab.route,
-                            onClick = {
-                                nav.navigate(tab.route) {
-                                    popUpTo(Routes.Home) { saveState = true }
-                                    launchSingleTop = true
-                                    restoreState = true
-                                }
-                            },
-                            icon = { Icon(tab.icon, null) },
-                            label = { Text(stringResource(tab.label)) },
-                        )
+                FloatingNavBar(route) { r ->
+                    nav.navigate(r) {
+                        popUpTo(Routes.Home) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
                     }
                 }
             }
@@ -253,5 +263,47 @@ fun AppNavHost(vm: AppViewModel, settings: AppSettings) {
                 if (d != HcDialog.Unavailable) TextButton(onClick = { hcDialog = null }) { Text(stringResource(R.string.close)) }
             },
         )
+    }
+}
+
+/** Floating pill navigation bar: the selected tab opens into a pill with its name (Material 3 Expressive). */
+@Composable
+private fun FloatingNavBar(route: String?, onSelect: (String) -> Unit) {
+    Box(
+        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 16.dp, vertical = 10.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            tonalElevation = 3.dp,
+            shadowElevation = 6.dp,
+        ) {
+            Row(Modifier.padding(6.dp), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
+                Tabs.forEach { tab ->
+                    val on = route == tab.route
+                    val bg by animateColorAsState(
+                        if (on) MaterialTheme.colorScheme.primaryContainer else Color.Transparent,
+                        animationSpec = effectsSpring(), label = "navBg",
+                    )
+                    val fg = if (on) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
+                    Row(
+                        Modifier
+                            .animateContentSize(spatialSpring())
+                            .clip(CircleShape)
+                            .background(bg)
+                            .clickable { onSelect(tab.route) }
+                            .padding(horizontal = 18.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(tab.icon, stringResource(tab.label), tint = fg)
+                        if (on) {
+                            Spacer(Modifier.width(8.dp))
+                            Text(stringResource(tab.label), style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
+                        }
+                    }
+                }
+            }
+        }
     }
 }

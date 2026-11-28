@@ -49,6 +49,7 @@ import com.healthstats.app.data.model.Workout
 import com.healthstats.app.data.model.sourceLabel
 import com.healthstats.app.ui.components.AppScreen
 import com.healthstats.app.ui.components.BarChart
+import com.healthstats.app.ui.components.BigPillButton
 import com.healthstats.app.ui.components.ExplainedCard
 import com.healthstats.app.ui.components.LineChart
 import com.healthstats.app.ui.components.RouteMap
@@ -177,7 +178,7 @@ fun WorkoutDetailScreen(id: String, settings: AppSettings, onBack: () -> Unit) {
                 ) {
                     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(stringResource(R.string.detail_route_allow_sub), style = MaterialTheme.typography.bodyMedium)
-                        Button(onClick = { d.consentId?.let { consent.launch(it) } }) { Text(stringResource(R.string.detail_route_allow)) }
+                        BigPillButton(stringResource(R.string.detail_route_allow), { d.consentId?.let { consent.launch(it) } })
                     }
                 }
             }

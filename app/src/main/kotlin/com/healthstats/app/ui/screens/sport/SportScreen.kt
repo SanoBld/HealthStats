@@ -35,6 +35,7 @@ import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.data.model.Workout
 import com.healthstats.app.data.model.sportOf
 import com.healthstats.app.ui.components.BarChart
+import com.healthstats.app.ui.components.ConnectedButtonGroup
 import com.healthstats.app.ui.components.EmptyState
 import com.healthstats.app.ui.components.ExplainedCard
 import com.healthstats.app.ui.components.AppScreen
@@ -137,11 +138,7 @@ fun SportScreen(
             TileGrid(tiles)
 
             // Trend graph with metric chips
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                items(SportMetric.entries.toList()) { e ->
-                    FilterChip(selected = e == m, onClick = { mIdx = e.ordinal; cursor = null }, label = { Text(stringResource(e.label)) })
-                }
-            }
+            ConnectedButtonGroup(SportMetric.entries.map { it to stringResource(it.label) }, m, { mIdx = it.ordinal; cursor = null })
             if (pts.size >= 2) {
                 val xs = pts.indices.map { it / (pts.size - 1f) }
                 val ys = pts.map { valueOf(it, m).toFloat() }

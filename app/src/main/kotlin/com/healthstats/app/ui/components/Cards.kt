@@ -100,11 +100,11 @@ fun StepsRing(steps: Int, goal: Int, modifier: Modifier = Modifier) {
     val progress = remember { Animatable(0f) }
     LaunchedEffect(target) { progress.animateTo(target, spatialSpring()) }
     val shownSteps by animateIntAsState(steps, animationSpec = tween(900), label = "steps")
-    val track = MaterialTheme.colorScheme.surfaceContainerHighest
-    val color = MaterialTheme.colorScheme.primary
+    val color = androidx.compose.material3.LocalContentColor.current
+    val track = color.copy(alpha = 0.14f)
     Box(modifier.size(150.dp), contentAlignment = Alignment.Center) {
         Canvas(Modifier.size(150.dp)) {
-            val stroke = 16.dp.toPx()
+            val stroke = 20.dp.toPx()
             val inset = stroke / 2
             val arcSize = Size(size.width - stroke, size.height - stroke)
             drawArc(track, 0f, 360f, false, Offset(inset, inset), arcSize, style = Stroke(stroke, cap = StrokeCap.Round))
@@ -113,25 +113,27 @@ fun StepsRing(steps: Int, goal: Int, modifier: Modifier = Modifier) {
             }
         }
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(fmtInt(shownSteps), style = MaterialTheme.typography.headlineMedium)
+            Text(fmtInt(shownSteps), style = MaterialTheme.typography.headlineLarge)
             Text(
                 "${(target * 100).toInt()} %",
                 style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = color.copy(alpha = 0.7f),
             )
         }
     }
 }
 
 @Composable
-fun MetricTile(label: String, value: String, modifier: Modifier = Modifier) {
+fun MetricTile(label: String, value: String, modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color? = null) {
+    val cc = androidx.compose.material3.LocalContentColor.current
     Card(
         modifier,
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = if (tint == null) CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+        else CardDefaults.cardColors(containerColor = tint, contentColor = cc),
         shape = MaterialTheme.shapes.medium,
     ) {
         Column(Modifier.padding(14.dp).fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
+            Text(label, style = MaterialTheme.typography.labelSmall, color = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.7f), maxLines = 2)
             Text(value, style = MaterialTheme.typography.titleMedium)
         }
     }

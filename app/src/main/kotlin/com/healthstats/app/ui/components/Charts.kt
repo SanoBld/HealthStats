@@ -45,7 +45,7 @@ fun BarChart(
 ) {
     val progress = remember(values) { Animatable(0f) }
     LaunchedEffect(values) { progress.animateTo(1f, spatialSpring()) }
-    val track = MaterialTheme.colorScheme.surfaceContainerHighest
+    val track = androidx.compose.material3.LocalContentColor.current.copy(alpha = 0.10f)
     val select by rememberUpdatedState(onSelect)
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Canvas(

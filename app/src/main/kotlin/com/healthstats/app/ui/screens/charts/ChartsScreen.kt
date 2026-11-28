@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import com.healthstats.app.data.model.sportOf
 import com.healthstats.app.ui.components.AppScreen
+import com.healthstats.app.ui.components.ConnectedButtonGroup
 import com.healthstats.app.ui.components.FullLoader
 import com.healthstats.app.ui.components.SyncAction
 import com.healthstats.app.ui.components.syncText
@@ -161,16 +162,8 @@ fun ChartsScreen(health: HealthState, colored: Boolean, onOpenWorkout: (String) 
         Modifier.padding(inner).verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, top = 4.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(ChartMetric.entries.toList()) { m ->
-                FilterChip(selected = m == metric, onClick = { metricIdx = m.ordinal }, label = { Text(stringResource(m.label)) })
-            }
-        }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(periods) { (days, label) ->
-                FilterChip(selected = period == days, onClick = { period = days }, label = { Text(stringResource(label)) })
-            }
-        }
+        ConnectedButtonGroup(ChartMetric.entries.map { it to stringResource(it.label) }, metric, { metricIdx = it.ordinal })
+        ConnectedButtonGroup(periods.map { it.first to stringResource(it.second) }, period, { period = it })
 
         if (series.values.isEmpty() || total <= 0f) {
             EmptyState(Icons.Rounded.BarChart, stringResource(R.string.charts_empty))

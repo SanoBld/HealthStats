@@ -14,6 +14,9 @@ import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LocalContentColor
+import androidx.compose.material3.contentColorFor
+import androidx.compose.ui.graphics.Color
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -40,24 +43,25 @@ fun ExplainedCard(
     explanation: String,
     modifier: Modifier = Modifier,
     value: String? = null,
+    container: Color = MaterialTheme.colorScheme.surfaceContainer,
     content: @Composable () -> Unit,
 ) {
     var open by remember { mutableStateOf(false) }
     Card(
         modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer),
+        colors = CardDefaults.cardColors(containerColor = container, contentColor = contentColorFor(container)),
         shape = MaterialTheme.shapes.extraLarge,
     ) {
         Column(Modifier.padding(start = 22.dp, end = 22.dp, top = 8.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium)
-                if (value != null) Text(value, style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                Text(title, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge)
+                if (value != null) Text(value, style = MaterialTheme.typography.titleLarge)
                 IconButton(onClick = { open = !open }) {
                     Icon(if (open) Icons.Rounded.Close else Icons.Rounded.Info, stringResource(R.string.info))
                 }
             }
             AnimatedVisibility(open) {
-                Text(explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(explanation, style = MaterialTheme.typography.bodySmall, color = LocalContentColor.current.copy(alpha = 0.8f))
             }
             Box { content() }
         }

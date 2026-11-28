@@ -46,6 +46,8 @@ import com.healthstats.app.data.health.HealthState
 import com.healthstats.app.data.local.AppSettings
 import com.healthstats.app.data.local.SettingsStore.Keys
 import com.healthstats.app.data.local.ThemeMode
+import com.healthstats.app.ui.components.BigPillButton
+import com.healthstats.app.ui.components.ConnectedButtonGroup
 import com.healthstats.app.ui.components.DateField
 import com.healthstats.app.ui.components.AppScreen
 import com.healthstats.app.ui.components.SyncAction
@@ -146,19 +148,15 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
         }
 
         Section(stringResource(R.string.set_appearance)) {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            ConnectedButtonGroup(
                 listOf(
-                    ThemeMode.System to R.string.theme_system,
-                    ThemeMode.Light to R.string.theme_light,
-                    ThemeMode.Dark to R.string.theme_dark,
-                ).forEach { (mode, label) ->
-                    FilterChip(
-                        selected = settings.theme == mode,
-                        onClick = { vm.set(Keys.THEME, mode.ordinal) },
-                        label = { Text(stringResource(label)) },
-                    )
-                }
-            }
+                    ThemeMode.System to stringResource(R.string.theme_system),
+                    ThemeMode.Light to stringResource(R.string.theme_light),
+                    ThemeMode.Dark to stringResource(R.string.theme_dark),
+                ),
+                settings.theme,
+                { vm.set(Keys.THEME, it.ordinal) },
+            )
             SwitchRow(stringResource(R.string.set_dynamic), settings.dynamicColor) { vm.set(Keys.DYNAMIC, it) }
             SwitchRow(stringResource(R.string.set_sport_colors), settings.sportColors) { vm.set(Keys.SPORT_COLORS, it) }
             Column(Modifier.fillMaxWidth().clickable { openLanguageSettings(ctx) }) {
@@ -169,7 +167,7 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
 
         Section(stringResource(R.string.set_data)) {
             if (health.permitted) {
-                Button(onClick = { vm.sync() }, enabled = !health.loading) { Text(stringResource(R.string.sync_now)) }
+                BigPillButton(stringResource(R.string.sync_now), { vm.sync() }, enabled = !health.syncing)
             }
             TextButton(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
             TextButton(onClick = { openHealthConnect(ctx) }) { Text(stringResource(R.string.set_open_hc)) }
@@ -218,7 +216,7 @@ fun SettingsScreen(settings: AppSettings, health: HealthState, vm: AppViewModel,
                 }
             }
             if (rows.any { perms[it.second] !in health.granted }) {
-                Button(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
+                BigPillButton(stringResource(R.string.hc_allow), onConnect)
             }
         }
 

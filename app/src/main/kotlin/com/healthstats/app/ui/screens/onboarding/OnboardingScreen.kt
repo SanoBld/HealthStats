@@ -45,6 +45,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.healthstats.app.R
 import com.healthstats.app.ui.components.DateField
+import com.healthstats.app.ui.components.BigPillButton
 import com.healthstats.app.ui.components.CookieLoader
 
 private const val LAST_STEP = 3
@@ -149,13 +150,11 @@ fun OnboardingScreen(
             }
             Spacer(Modifier.weight(1f))
             when {
-                step < LAST_STEP -> Button(onClick = { step++ }) {
-                    Text(stringResource(if (step == 0) R.string.onb_start else R.string.onb_next))
-                }
-                permitted -> Button(onClick = finish) { Text(stringResource(R.string.onb_next)) }
+                step < LAST_STEP -> BigPillButton(stringResource(if (step == 0) R.string.onb_start else R.string.onb_next), { step++ })
+                permitted -> BigPillButton(stringResource(R.string.onb_next), finish)
                 else -> {
                     TextButton(onClick = finish) { Text(stringResource(R.string.hc_skip)) }
-                    Button(onClick = onConnect) { Text(stringResource(R.string.hc_allow)) }
+                    BigPillButton(stringResource(R.string.hc_allow), onConnect)
                 }
             }
         }
